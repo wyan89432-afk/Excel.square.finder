@@ -1,35 +1,83 @@
 // Global state
 let tableData = JSON.parse(JSON.stringify(TABLE_DATA));
 let headers = [...TABLE_HEADERS];
-let searchResults = null; // stores highlight info
+let searchResults = null;
+let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1 };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     renderTable1();
+    setupZoom();
 });
+
+// ============ ZOOM FEATURE ============
+function setupZoom() {
+    ['table1Wrapper', 'table2Wrapper', 'table3Wrapper', 'table4Wrapper'].forEach(id => {
+        const wrapper = document.getElementById(id);
+        if (!wrapper) return;
+        wrapper.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const tableKey = id.replace('Wrapper', '');
+                const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                zoomLevels[tableKey] = Math.max(0.3, Math.min(2.5, zoomLevels[tableKey] + delta));
+                const table = wrapper.querySelector('table');
+                if (table) {
+                    table.style.transform = `scale(${zoomLevels[tableKey]})`;
+                    table.style.transformOrigin = 'top left';
+                }
+            }
+        }, { passive: false });
+    });
+}
+
+function zoomIn(tableId) {
+    const key = tableId;
+    zoomLevels[key] = Math.min(2.5, zoomLevels[key] + 0.1);
+    applyZoom(key);
+}
+
+function zoomOut(tableId) {
+    const key = tableId;
+    zoomLevels[key] = Math.max(0.3, zoomLevels[key] - 0.1);
+    applyZoom(key);
+}
+
+function zoomReset(tableId) {
+    zoomLevels[tableId] = 1;
+    applyZoom(tableId);
+}
+
+function applyZoom(tableId) {
+    const wrapper = document.getElementById(tableId + 'Wrapper');
+    if (!wrapper) return;
+    const table = wrapper.querySelector('table');
+    if (table) {
+        table.style.transform = `scale(${zoomLevels[tableId]})`;
+        table.style.transformOrigin = 'top left';
+    }
+}
 
 // ============ TABLE 1: Fixed/Editable Table ============
 function renderTable1() {
     const table = document.getElementById('table1');
     table.innerHTML = '';
-    
-    // Header row
+
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
     rowNumTh.textContent = 'Row';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
-    
-    headers.forEach((h, ci) => {
+
+    headers.forEach((h) => {
         const th = document.createElement('th');
         th.textContent = h;
         headerRow.appendChild(th);
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-    
-    // Data rows
+
     const tbody = document.createElement('tbody');
     tableData.forEach((row, ri) => {
         const tr = document.createElement('tr');
@@ -37,7 +85,7 @@ function renderTable1() {
         rowNumTd.className = 'row-number';
         rowNumTd.textContent = ri + 1;
         tr.appendChild(rowNumTd);
-        
+
         row.forEach((cell, ci) => {
             const td = document.createElement('td');
             td.textContent = cell;
@@ -60,23 +108,23 @@ function editCell(ri, ci, td) {
     input.style.background = '#0f3460';
     input.style.color = '#fff';
     input.style.border = '1px solid #00d4ff';
-    
+
     input.onblur = () => {
         let val = input.value.trim();
         if (val !== '') {
             try {
                 let num = parseInt(val);
                 val = String(num).padStart(3, '0');
-            } catch(e) {}
+            } catch (e) { }
         }
         tableData[ri][ci] = val;
         td.textContent = val;
     };
-    
+
     input.onkeydown = (e) => {
         if (e.key === 'Enter') input.blur();
     };
-    
+
     td.textContent = '';
     td.appendChild(input);
     input.focus();
@@ -90,6 +138,8 @@ function addColumn() {
     renderTable1();
     if (searchResults) {
         renderTable2();
+        renderTable3();
+        renderTable4();
     }
 }
 
@@ -97,24 +147,22 @@ function addColumn() {
 function performSearch() {
     const input = document.getElementById('searchInput').value.trim();
     if (!input) return;
-    
-    // Parse search input
+
     const parsed = parseSearchInput(input);
     if (!parsed) {
         alert('Invalid format. Use: top134,334,789 or middle245,751,359 or last356,280,103');
         return;
     }
-    
+
     const { position, numbers } = parsed;
-    
-    // Find squares for each number
+
     searchResults = {
         position: position,
-        highlights: [] // [{color, squares: [{col, startRow}]}]
+        highlights: []
     };
-    
+
     const colors = ['yellow', 'green', 'red'];
-    
+
     for (let i = 0; i < numbers.length && i < 3; i++) {
         const digits = numbers[i].split('').map(Number);
         const squares = findSquares(position, digits);
@@ -124,12 +172,11 @@ function performSearch() {
             squares: squares
         });
     }
-    
-    // Show results
+
     document.getElementById('table2Section').style.display = 'block';
     document.getElementById('table3Section').style.display = 'block';
     document.getElementById('table4Section').style.display = 'block';
-    
+
     renderTable2();
     renderTable3();
     renderTable4();
@@ -138,7 +185,7 @@ function performSearch() {
 function parseSearchInput(input) {
     let position = '';
     let rest = '';
-    
+
     if (input.toLowerCase().startsWith('top')) {
         position = 'top';
         rest = input.substring(3);
@@ -151,10 +198,10 @@ function parseSearchInput(input) {
     } else {
         return null;
     }
-    
+
     const numbers = rest.split(',').map(s => s.trim()).filter(s => s.length === 3 && /^\d{3}$/.test(s));
     if (numbers.length === 0) return null;
-    
+
     return { position, numbers };
 }
 
@@ -170,25 +217,24 @@ function findSquares(position, digits) {
     const squares = [];
     const numRows = tableData.length;
     const numCols = headers.length;
-    
-    // Check every group of 3 consecutive rows in each column
+
     for (let col = 0; col < numCols; col++) {
         for (let startRow = 0; startRow <= numRows - 3; startRow++) {
             const d1 = getDigitAtPosition(tableData[startRow][col], position);
             const d2 = getDigitAtPosition(tableData[startRow + 1][col], position);
             const d3 = getDigitAtPosition(tableData[startRow + 2][col], position);
-            
+
             if (d1 < 0 || d2 < 0 || d3 < 0) continue;
-            
+
             const found = [d1, d2, d3].sort().join('');
             const target = [...digits].sort().join('');
-            
+
             if (found === target) {
                 squares.push({ col: col, startRow: startRow });
             }
         }
     }
-    
+
     return squares;
 }
 
@@ -196,18 +242,16 @@ function findSquares(position, digits) {
 function renderTable2() {
     const table = document.getElementById('table2');
     table.innerHTML = '';
-    
-    // Build highlight map
+
     const highlightMap = buildHighlightMap();
-    
-    // Header row
+
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
     rowNumTh.textContent = 'Row';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
-    
+
     headers.forEach((h) => {
         const th = document.createElement('th');
         th.textContent = h;
@@ -215,8 +259,7 @@ function renderTable2() {
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-    
-    // Data rows
+
     const tbody = document.createElement('tbody');
     tableData.forEach((row, ri) => {
         const tr = document.createElement('tr');
@@ -224,11 +267,11 @@ function renderTable2() {
         rowNumTd.className = 'row-number';
         rowNumTd.textContent = ri + 1;
         tr.appendChild(rowNumTd);
-        
+
         row.forEach((cell, ci) => {
             const td = document.createElement('td');
             td.textContent = cell;
-            
+
             const key = `${ri}-${ci}`;
             if (highlightMap[key]) {
                 td.className = `highlight-${highlightMap[key]}`;
@@ -243,19 +286,18 @@ function renderTable2() {
 function buildHighlightMap() {
     const map = {};
     if (!searchResults) return map;
-    
+
     searchResults.highlights.forEach(h => {
         h.squares.forEach(sq => {
             for (let r = 0; r < 3; r++) {
                 const key = `${sq.startRow + r}-${sq.col}`;
-                // Don't overwrite earlier colors (priority: yellow > green > red)
                 if (!map[key]) {
                     map[key] = h.color;
                 }
             }
         });
     });
-    
+
     return map;
 }
 
@@ -263,19 +305,18 @@ function buildHighlightMap() {
 function renderTable3() {
     const table = document.getElementById('table3');
     table.innerHTML = '';
-    
+
     const highlightMap = buildHighlightMap();
-    const connections = calculateGapConnections('ltr');
-    const connectionMap = buildConnectionMap(connections);
-    
-    // Header row
+    const connections = calculateGapConnectionsLTR();
+    const connectionCells = buildConnectionCellMap(connections);
+
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
     rowNumTh.textContent = 'Row';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
-    
+
     headers.forEach((h) => {
         const th = document.createElement('th');
         th.textContent = h;
@@ -283,8 +324,7 @@ function renderTable3() {
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-    
-    // Data rows
+
     const tbody = document.createElement('tbody');
     tableData.forEach((row, ri) => {
         const tr = document.createElement('tr');
@@ -292,45 +332,46 @@ function renderTable3() {
         rowNumTd.className = 'row-number';
         rowNumTd.textContent = ri + 1;
         tr.appendChild(rowNumTd);
-        
+
         row.forEach((cell, ci) => {
             const td = document.createElement('td');
             td.textContent = cell;
-            
+            td.setAttribute('data-row', ri);
+            td.setAttribute('data-col', ci);
+
             const key = `${ri}-${ci}`;
-            if (highlightMap[key]) {
-                td.className = `highlight-${highlightMap[key]}`;
-            }
-            if (connectionMap[key]) {
-                td.classList.add('connection-line');
+            if (connectionCells[key]) {
+                td.className = `highlight-${connectionCells[key]}`;
+            } else if (highlightMap[key]) {
+                // Only show highlight if part of a valid connection
+                // Keep original style (no highlight) if not connected
             }
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    
-    // Draw connection lines
-    drawConnections('table3Wrapper', connections);
+
+    // Draw blue lines
+    setTimeout(() => drawConnectionLines('table3Wrapper', table, connections), 150);
 }
 
 // ============ TABLE 4: Gap Calculation Right to Left ============
 function renderTable4() {
     const table = document.getElementById('table4');
     table.innerHTML = '';
-    
+
     const highlightMap = buildHighlightMap();
-    const connections = calculateGapConnections('rtl');
-    const connectionMap = buildConnectionMap(connections);
-    
-    // Header row
+    const connections = calculateGapConnectionsRTL();
+    const connectionCells = buildConnectionCellMap(connections);
+
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
     rowNumTh.textContent = 'Row';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
-    
+
     headers.forEach((h) => {
         const th = document.createElement('th');
         th.textContent = h;
@@ -338,8 +379,7 @@ function renderTable4() {
     });
     thead.appendChild(headerRow);
     table.appendChild(thead);
-    
-    // Data rows
+
     const tbody = document.createElement('tbody');
     tableData.forEach((row, ri) => {
         const tr = document.createElement('tr');
@@ -347,71 +387,58 @@ function renderTable4() {
         rowNumTd.className = 'row-number';
         rowNumTd.textContent = ri + 1;
         tr.appendChild(rowNumTd);
-        
+
         row.forEach((cell, ci) => {
             const td = document.createElement('td');
             td.textContent = cell;
-            
+            td.setAttribute('data-row', ri);
+            td.setAttribute('data-col', ci);
+
             const key = `${ri}-${ci}`;
-            if (highlightMap[key]) {
-                td.className = `highlight-${highlightMap[key]}`;
-            }
-            if (connectionMap[key]) {
-                td.classList.add('connection-line');
+            if (connectionCells[key]) {
+                td.className = `highlight-${connectionCells[key]}`;
             }
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-    
-    // Draw connection lines
-    drawConnections('table4Wrapper', connections);
+
+    setTimeout(() => drawConnectionLines('table4Wrapper', table, connections), 150);
 }
 
-// ============ GAP CALCULATION LOGIC ============
-function calculateGapConnections(direction) {
-    if (!searchResults || searchResults.highlights.length < 2) return [];
-    
+// ============ GAP CALCULATION: LEFT TO RIGHT ============
+function calculateGapConnectionsLTR() {
+    if (!searchResults || searchResults.highlights.length < 3) return [];
+
     const connections = [];
-    const yellowSquares = searchResults.highlights[0] ? searchResults.highlights[0].squares : [];
-    const greenSquares = searchResults.highlights[1] ? searchResults.highlights[1].squares : [];
-    const redSquares = searchResults.highlights.length > 2 ? searchResults.highlights[2].squares : [];
-    
+    const yellowSquares = searchResults.highlights[0].squares;
+    const greenSquares = searchResults.highlights[1].squares;
+    const redSquares = searchResults.highlights[2].squares;
     const numRows = tableData.length; // 24
-    const numCols = headers.length;
-    
-    // For each yellow square, find green squares with same gap to red
-    yellowSquares.forEach(yellow => {
-        greenSquares.forEach(green => {
-            // Calculate gap between yellow and green
-            let yellowPos, greenPos, gap;
-            
-            if (direction === 'ltr') {
-                // Left to right: compare by column position first, then row
-                yellowPos = yellow.col * numRows + yellow.startRow;
-                greenPos = green.col * numRows + green.startRow;
-                gap = greenPos - yellowPos;
-            } else {
-                // Right to left: reverse column direction
-                yellowPos = (numCols - 1 - yellow.col) * numRows + yellow.startRow;
-                greenPos = (numCols - 1 - green.col) * numRows + green.startRow;
-                gap = greenPos - yellowPos;
-            }
-            
-            if (gap <= 0) return; // green must come after yellow
-            
-            // Look for red at same gap from green
-            redSquares.forEach(red => {
-                let redPos;
-                if (direction === 'ltr') {
-                    redPos = red.col * numRows + red.startRow;
-                } else {
-                    redPos = (numCols - 1 - red.col) * numRows + red.startRow;
-                }
-                
-                const gapGreenRed = redPos - greenPos;
-                
+
+    // Sort squares by column (left to right), then by startRow
+    const sortLTR = (a, b) => a.col !== b.col ? a.col - b.col : a.startRow - b.startRow;
+    const sortedYellow = [...yellowSquares].sort(sortLTR);
+    const sortedGreen = [...greenSquares].sort(sortLTR);
+    const sortedRed = [...redSquares].sort(sortLTR);
+
+    // For each yellow square, look for green squares to the right (or same column, below)
+    sortedYellow.forEach(yellow => {
+        sortedGreen.forEach(green => {
+            // Green must be to the right of or after yellow (LTR)
+            // Calculate linear position: col * numRows + startRow
+            const yellowLinear = yellow.col * numRows + yellow.startRow;
+            const greenLinear = green.col * numRows + green.startRow;
+            const gap = greenLinear - yellowLinear;
+
+            if (gap <= 0) return;
+
+            // Now find red at same gap from green
+            sortedRed.forEach(red => {
+                const redLinear = red.col * numRows + red.startRow;
+                const gapGreenRed = redLinear - greenLinear;
+
                 if (gap === gapGreenRed) {
                     connections.push({
                         yellow: yellow,
@@ -423,85 +450,139 @@ function calculateGapConnections(direction) {
             });
         });
     });
-    
+
     return connections;
 }
 
-function buildConnectionMap(connections) {
+// ============ GAP CALCULATION: RIGHT TO LEFT ============
+function calculateGapConnectionsRTL() {
+    if (!searchResults || searchResults.highlights.length < 3) return [];
+
+    const connections = [];
+    const yellowSquares = searchResults.highlights[0].squares;
+    const greenSquares = searchResults.highlights[1].squares;
+    const redSquares = searchResults.highlights[2].squares;
+    const numRows = tableData.length; // 24
+    const numCols = headers.length;
+
+    // For RTL, we reverse the column order for linear position
+    // rightmost column = position 0
+    const sortRTL = (a, b) => {
+        const aPos = (numCols - 1 - a.col) * numRows + a.startRow;
+        const bPos = (numCols - 1 - b.col) * numRows + b.startRow;
+        return aPos - bPos;
+    };
+
+    const sortedYellow = [...yellowSquares].sort(sortRTL);
+    const sortedGreen = [...greenSquares].sort(sortRTL);
+    const sortedRed = [...redSquares].sort(sortRTL);
+
+    sortedYellow.forEach(yellow => {
+        const yellowLinear = (numCols - 1 - yellow.col) * numRows + yellow.startRow;
+
+        sortedGreen.forEach(green => {
+            const greenLinear = (numCols - 1 - green.col) * numRows + green.startRow;
+            const gap = greenLinear - yellowLinear;
+
+            if (gap <= 0) return;
+
+            sortedRed.forEach(red => {
+                const redLinear = (numCols - 1 - red.col) * numRows + red.startRow;
+                const gapGreenRed = redLinear - greenLinear;
+
+                if (gap === gapGreenRed) {
+                    connections.push({
+                        yellow: yellow,
+                        green: green,
+                        red: red,
+                        gap: gap
+                    });
+                }
+            });
+        });
+    });
+
+    return connections;
+}
+
+// ============ BUILD CONNECTION CELL MAP ============
+function buildConnectionCellMap(connections) {
     const map = {};
+
     connections.forEach(conn => {
-        // Mark all cells in the connected squares
         for (let r = 0; r < 3; r++) {
-            map[`${conn.yellow.startRow + r}-${conn.yellow.col}`] = true;
-            map[`${conn.green.startRow + r}-${conn.green.col}`] = true;
-            map[`${conn.red.startRow + r}-${conn.red.col}`] = true;
+            map[`${conn.yellow.startRow + r}-${conn.yellow.col}`] = 'yellow';
+            map[`${conn.green.startRow + r}-${conn.green.col}`] = 'green';
+            map[`${conn.red.startRow + r}-${conn.red.col}`] = 'red';
         }
     });
+
     return map;
 }
 
-function drawConnections(wrapperId, connections) {
+// ============ DRAW BLUE CONNECTION LINES ============
+function drawConnectionLines(wrapperId, table, connections) {
     const wrapper = document.getElementById(wrapperId);
-    
+
     // Remove existing SVG
     const existingSvg = wrapper.querySelector('.svg-overlay');
     if (existingSvg) existingSvg.remove();
-    
+
     if (connections.length === 0) return;
-    
-    const table = wrapper.querySelector('table');
-    if (!table) return;
-    
-    // Wait for render
-    setTimeout(() => {
-        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        svg.classList.add('svg-overlay');
-        svg.style.position = 'absolute';
-        svg.style.top = '0';
-        svg.style.left = '0';
-        svg.style.width = table.offsetWidth + 'px';
-        svg.style.height = table.offsetHeight + 'px';
-        svg.style.pointerEvents = 'none';
-        svg.style.zIndex = '5';
-        
-        connections.forEach(conn => {
-            // Get cell positions
-            const yellowCell = getCellElement(table, conn.yellow.startRow + 1, conn.yellow.col + 1);
-            const greenCell = getCellElement(table, conn.green.startRow + 1, conn.green.col + 1);
-            const redCell = getCellElement(table, conn.red.startRow + 1, conn.red.col + 1);
-            
-            if (yellowCell && greenCell) {
-                drawLine(svg, yellowCell, greenCell, table);
-            }
-            if (greenCell && redCell) {
-                drawLine(svg, greenCell, redCell, table);
-            }
-        });
-        
-        wrapper.style.position = 'relative';
-        wrapper.appendChild(svg);
-    }, 100);
-}
 
-function getCellElement(table, rowIdx, colIdx) {
-    // rowIdx is 1-based (data row), colIdx is 1-based (after row number column)
-    const rows = table.querySelectorAll('tbody tr');
-    if (rowIdx < 1 || rowIdx > rows.length) return null;
-    const cells = rows[rowIdx - 1].querySelectorAll('td');
-    if (colIdx < 1 || colIdx >= cells.length) return null;
-    return cells[colIdx]; // +0 because first td is row number
-}
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('svg-overlay');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = table.scrollWidth + 'px';
+    svg.style.height = table.scrollHeight + 'px';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '5';
+    svg.setAttribute('width', table.scrollWidth);
+    svg.setAttribute('height', table.scrollHeight);
 
-function drawLine(svg, cell1, cell2, table) {
     const tableRect = table.getBoundingClientRect();
+
+    connections.forEach(conn => {
+        // Get middle cell of each square (row+1 of the 3)
+        const yellowCell = getTableCell(table, conn.yellow.startRow + 1, conn.yellow.col);
+        const greenCell = getTableCell(table, conn.green.startRow + 1, conn.green.col);
+        const redCell = getTableCell(table, conn.red.startRow + 1, conn.red.col);
+
+        if (yellowCell && greenCell) {
+            const line = createSvgLine(yellowCell, greenCell, tableRect);
+            svg.appendChild(line);
+        }
+        if (greenCell && redCell) {
+            const line = createSvgLine(greenCell, redCell, tableRect);
+            svg.appendChild(line);
+        }
+    });
+
+    wrapper.style.position = 'relative';
+    wrapper.appendChild(svg);
+}
+
+function getTableCell(table, rowIdx, colIdx) {
+    // rowIdx is 0-based data row, colIdx is 0-based column
+    const rows = table.querySelectorAll('tbody tr');
+    if (rowIdx < 0 || rowIdx >= rows.length) return null;
+    const cells = rows[rowIdx].querySelectorAll('td');
+    // cells[0] is row number, cells[1] is first data column
+    if (colIdx + 1 >= cells.length) return null;
+    return cells[colIdx + 1];
+}
+
+function createSvgLine(cell1, cell2, tableRect) {
     const rect1 = cell1.getBoundingClientRect();
     const rect2 = cell2.getBoundingClientRect();
-    
+
     const x1 = rect1.left - tableRect.left + rect1.width / 2;
     const y1 = rect1.top - tableRect.top + rect1.height / 2;
     const x2 = rect2.left - tableRect.left + rect2.width / 2;
     const y2 = rect2.top - tableRect.top + rect2.height / 2;
-    
+
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', x1);
     line.setAttribute('y1', y1);
@@ -509,8 +590,9 @@ function drawLine(svg, cell1, cell2, table) {
     line.setAttribute('y2', y2);
     line.setAttribute('stroke', '#007bff');
     line.setAttribute('stroke-width', '3');
-    line.setAttribute('stroke-opacity', '0.8');
-    svg.appendChild(line);
+    line.setAttribute('stroke-opacity', '0.85');
+    line.setAttribute('stroke-linecap', 'round');
+    return line;
 }
 
 // Enter key support for search

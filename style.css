@@ -29,6 +29,12 @@ h2 {
     font-size: 1.3em;
 }
 
+.table-desc {
+    color: #aaa;
+    font-size: 0.85em;
+    margin-bottom: 10px;
+}
+
 .search-section {
     background: #16213e;
     padding: 20px;
@@ -89,10 +95,16 @@ h2 {
     position: relative;
 }
 
+.table-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 .add-col-btn {
-    position: absolute;
-    top: 15px;
-    right: 15px;
     padding: 8px 15px;
     background: #28a745;
     color: #fff;
@@ -106,10 +118,30 @@ h2 {
     background: #218838;
 }
 
+.zoom-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.zoom-controls button {
+    padding: 5px 12px;
+    background: #0f3460;
+    color: #00d4ff;
+    border: 1px solid #00d4ff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.zoom-controls button:hover {
+    background: #00d4ff;
+    color: #1a1a2e;
+}
+
 .table-wrapper {
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: 600px;
+    overflow: auto;
+    max-height: 700px;
     position: relative;
 }
 
@@ -117,6 +149,7 @@ table {
     border-collapse: collapse;
     font-size: 12px;
     white-space: nowrap;
+    transition: transform 0.2s ease;
 }
 
 th, td {
@@ -169,16 +202,6 @@ td.highlight-red {
     box-shadow: 0 0 5px #dc3545;
 }
 
-/* Connection line styles */
-td.connected {
-    position: relative;
-}
-
-td.connection-line {
-    border-left: 3px solid #007bff !important;
-    border-right: 3px solid #007bff !important;
-}
-
 .row-number {
     background: #0f3460 !important;
     color: #00d4ff !important;
@@ -193,4 +216,14 @@ td.connection-line {
     left: 0;
     pointer-events: none;
     z-index: 5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .search-section {
+        flex-direction: column;
+    }
+    #searchInput {
+        min-width: 100%;
+    }
 }

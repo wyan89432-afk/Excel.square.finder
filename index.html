@@ -9,21 +9,29 @@
 <body>
     <div class="container">
         <h1>Excel Square Finder</h1>
-        
+
         <!-- Search Bar -->
         <div class="search-section">
             <label for="searchInput">Search:</label>
             <input type="text" id="searchInput" placeholder="e.g. top134,334,789 or middle245,751,359 or last356,280,103">
             <button id="searchBtn" onclick="performSearch()">Search</button>
             <div class="search-help">
-                <small>Format: top/middle/last + 3 digits (comma separated for multiple). top=first digit, middle=second digit, last=third digit. Colors: 1st=Yellow, 2nd=Green, 3rd=Red</small>
+                <small>Format: top/middle/last + 3 digits (comma separated for multiple). top=first digit, middle=second digit, last=third digit.<br>
+                Colors: 1st=Yellow, 2nd=Green, 3rd=Red | Ctrl+Scroll to zoom tables</small>
             </div>
         </div>
 
         <!-- Table 1: Fixed Table -->
         <div class="table-section">
             <h2>Table-1: Fixed Data Table</h2>
-            <button class="add-col-btn" onclick="addColumn()">+ Add Column</button>
+            <div class="table-controls">
+                <button class="add-col-btn" onclick="addColumn()">+ Add Column</button>
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table1')">−</button>
+                    <button onclick="zoomReset('table1')">Reset</button>
+                    <button onclick="zoomIn('table1')">+</button>
+                </div>
+            </div>
             <div class="table-wrapper" id="table1Wrapper">
                 <table id="table1"></table>
             </div>
@@ -32,6 +40,13 @@
         <!-- Table 2: Search Results -->
         <div class="table-section" id="table2Section" style="display:none;">
             <h2>Table-2: Search Bar Results</h2>
+            <div class="table-controls">
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table2')">−</button>
+                    <button onclick="zoomReset('table2')">Reset</button>
+                    <button onclick="zoomIn('table2')">+</button>
+                </div>
+            </div>
             <div class="table-wrapper" id="table2Wrapper">
                 <table id="table2"></table>
             </div>
@@ -39,18 +54,32 @@
 
         <!-- Table 3: Gap Calculation Left to Right -->
         <div class="table-section" id="table3Section" style="display:none;">
-            <h2>Table-3: Gap Calculation (Left to Right)</h2>
+            <h2>Table-3: Gap Calculation (Left → Right)</h2>
+            <p class="table-desc">Yellow is marker. Searches left to right. Blue lines connect when yellow→green gap = green→red gap.</p>
+            <div class="table-controls">
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table3')">−</button>
+                    <button onclick="zoomReset('table3')">Reset</button>
+                    <button onclick="zoomIn('table3')">+</button>
+                </div>
+            </div>
             <div class="table-wrapper" id="table3Wrapper">
-                <canvas id="table3Canvas"></canvas>
                 <table id="table3"></table>
             </div>
         </div>
 
         <!-- Table 4: Gap Calculation Right to Left -->
         <div class="table-section" id="table4Section" style="display:none;">
-            <h2>Table-4: Gap Calculation (Right to Left)</h2>
+            <h2>Table-4: Gap Calculation (Right → Left)</h2>
+            <p class="table-desc">Yellow is marker. Searches right to left. Blue lines connect when yellow→green gap = green→red gap.</p>
+            <div class="table-controls">
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table4')">−</button>
+                    <button onclick="zoomReset('table4')">Reset</button>
+                    <button onclick="zoomIn('table4')">+</button>
+                </div>
+            </div>
             <div class="table-wrapper" id="table4Wrapper">
-                <canvas id="table4Canvas"></canvas>
                 <table id="table4"></table>
             </div>
         </div>
