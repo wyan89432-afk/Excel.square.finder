@@ -1,0 +1,69 @@
+Image Analysis - Gap Logic Reference
+
+IMAGE 1 (Table-3 LTR - Left to Right):
+- Table is rotated 90 degrees (columns shown as rows in the image)
+- Column headers at bottom: 69, 70, 71, ... 27
+- Row numbers on left: No., 1, 2, 3, ... 24
+- Yellow squares: Column 23, Rows 8,9,10 (values: 903, 272, 872)
+- Green squares: Column 23, Rows 17,18,19 (values: 431, 224, 143) -- wait, looking again
+  Actually from the image: Yellow at col 23 rows 8-10, Green at col 23 rows 17-19
+  But wait - the gap between yellow (row 8) and green (row 17) = 9 rows gap (or row groups)
+  Then red should be at same gap from green
+  Red at column 25, rows 22,23,24 (values: 777, 147, 178)
+  
+  Actually let me re-read: 
+  - Yellow: column 24, rows 7,8,9 (690, 593, 504) -- no wait
+  
+  Looking more carefully at first image:
+  - Yellow squares (col 23): rows 8,9,10 area - values 903, 272, 872
+  - Green squares (col 23): rows 17,18,19 area - values 431, 224, 143  
+  - Red squares (col 25): rows 22,23,24 - values 777, 147, 178
+  - Blue line connects yellow → green → red diagonally
+  
+  Gap calculation:
+  - Yellow startRow = 8 (0-indexed: 7), Green startRow = 17 (0-indexed: 16)
+  - Row gap between yellow and green: 17 - 8 = 9 rows
+  - Green is in same column as yellow (col 23)
+  - Red needs to be found: green startRow + gap = 17 + 9 = 26, but max is 24
+  - So overflow to next column: 26 - 24 = 2, so red is at col 24 or 25, row 2 area
+  - Wait, actually red is at rows 22,23,24 in col 25
+  
+  Let me reconsider the gap logic:
+  - The gap is measured as the distance between the START of each 3-row block
+  - Yellow start = row 8, Green start = row 17 → gap = 9
+  - Green start = row 17, expected Red start = row 17 + 9 = row 26
+  - Since row 26 > 24, we wrap to next column: row 26 - 24 = row 2 in next column
+  - But red appears at rows 22-24 in col 25... 
+  
+  Actually looking at the image again more carefully:
+  - The blue line goes from yellow (top-left area) diagonally down-right to green, then continues to red
+  - This suggests the gap wraps across columns
+
+IMAGE 2 (Table-4 RTL - Right to Left):
+- Yellow squares: Column 78, rows 8,9,10 area (values: 427, 744, 151)  
+- Green squares: Column 74, rows 13,14,15 area (values: 906, 731, 056)
+- Red/Yellow at bottom: Column 70, rows 20,21,22 area (values: 203, 719, 063/000)
+- Blue line connects them diagonally
+
+Gap calculation for RTL:
+- Yellow at col 78, startRow ~8
+- Green at col 74, startRow ~13
+- Column difference: 78 - 74 = 4 columns to the left
+- Row difference: 13 - 8 = 5 rows down
+- Red at col 70, startRow ~20
+- Column difference from green: 74 - 70 = 4 columns to the left (same!)
+- Row difference from green: 20 - 13 = 7 rows down -- hmm not same
+
+Wait - let me reconsider. The gap might be a LINEAR gap:
+- Linear position = col_offset * 24 + startRow
+- For LTR: col_offset = col_index (from left)
+- For RTL: col_offset = reverse col_index (from right)
+
+KEY INSIGHT from images:
+The gap is calculated as a LINEAR distance:
+- Each column has 24 rows
+- Linear position for LTR = col_index * 24 + startRow
+- Gap = linear_green - linear_yellow
+- If gap_yellow_green == gap_green_red → connect with blue line
+
+For RTL, same but columns are traversed right to left.

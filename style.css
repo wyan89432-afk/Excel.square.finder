@@ -141,81 +141,84 @@ h2 {
 
 .table-wrapper {
     overflow: auto;
-    max-height: 700px;
+    max-height: 800px;
     position: relative;
+}
+
+.table-inner {
+    position: relative;
+    display: inline-block;
+    transition: transform 0.2s ease;
 }
 
 table {
     border-collapse: collapse;
     font-size: 12px;
     white-space: nowrap;
-    transition: transform 0.2s ease;
 }
 
 th, td {
-    border: 1px solid #333;
+    border: 1px solid #444;
     padding: 4px 6px;
     text-align: center;
-    min-width: 45px;
+    min-width: 42px;
 }
 
 th {
-    background: #0f3460;
-    color: #00d4ff;
+    background: #c0392b;
+    color: #fff;
+    font-weight: bold;
     position: sticky;
     top: 0;
     z-index: 10;
 }
 
 td {
-    background: #1a1a2e;
-    color: #ddd;
+    background: #fff;
+    color: #000;
 }
 
 td.editable:hover {
-    background: #2a2a4e;
+    background: #f0f0f0;
     cursor: pointer;
 }
 
 /* Square highlight colors */
 td.highlight-yellow {
-    background: #ffd700 !important;
+    background: #ffff00 !important;
     color: #000 !important;
     font-weight: bold;
-    border: 2px solid #ffaa00;
-    box-shadow: 0 0 5px #ffd700;
+    border: 2px solid #cccc00;
 }
 
 td.highlight-green {
-    background: #28a745 !important;
-    color: #fff !important;
+    background: #00ff00 !important;
+    color: #000 !important;
     font-weight: bold;
-    border: 2px solid #1e7e34;
-    box-shadow: 0 0 5px #28a745;
+    border: 2px solid #00cc00;
 }
 
 td.highlight-red {
-    background: #dc3545 !important;
+    background: #ff0000 !important;
     color: #fff !important;
     font-weight: bold;
-    border: 2px solid #bd2130;
-    box-shadow: 0 0 5px #dc3545;
+    border: 2px solid #cc0000;
 }
 
 .row-number {
-    background: #0f3460 !important;
-    color: #00d4ff !important;
+    background: #c0392b !important;
+    color: #fff !important;
     font-weight: bold;
     min-width: 30px;
 }
 
-/* SVG overlay for lines */
+/* SVG overlay for blue lines */
 .svg-overlay {
     position: absolute;
     top: 0;
     left: 0;
     pointer-events: none;
-    z-index: 5;
+    z-index: 15;
 }
 
 /* Responsive */

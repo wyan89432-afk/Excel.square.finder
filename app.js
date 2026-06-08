@@ -8,6 +8,9 @@ let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1 };
 document.addEventListener('DOMContentLoaded', () => {
     renderTable1();
     setupZoom();
+    document.getElementById('searchInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') performSearch();
+    });
 });
 
 // ============ ZOOM FEATURE ============
@@ -20,27 +23,21 @@ function setupZoom() {
                 e.preventDefault();
                 const tableKey = id.replace('Wrapper', '');
                 const delta = e.deltaY > 0 ? -0.05 : 0.05;
-                zoomLevels[tableKey] = Math.max(0.3, Math.min(2.5, zoomLevels[tableKey] + delta));
-                const table = wrapper.querySelector('table');
-                if (table) {
-                    table.style.transform = `scale(${zoomLevels[tableKey]})`;
-                    table.style.transformOrigin = 'top left';
-                }
+                zoomLevels[tableKey] = Math.max(0.3, Math.min(3, zoomLevels[tableKey] + delta));
+                applyZoom(tableKey);
             }
         }, { passive: false });
     });
 }
 
 function zoomIn(tableId) {
-    const key = tableId;
-    zoomLevels[key] = Math.min(2.5, zoomLevels[key] + 0.1);
-    applyZoom(key);
+    zoomLevels[tableId] = Math.min(3, zoomLevels[tableId] + 0.15);
+    applyZoom(tableId);
 }
 
 function zoomOut(tableId) {
-    const key = tableId;
-    zoomLevels[key] = Math.max(0.3, zoomLevels[key] - 0.1);
-    applyZoom(key);
+    zoomLevels[tableId] = Math.max(0.3, zoomLevels[tableId] - 0.15);
+    applyZoom(tableId);
 }
 
 function zoomReset(tableId) {
@@ -51,22 +48,26 @@ function zoomReset(tableId) {
 function applyZoom(tableId) {
     const wrapper = document.getElementById(tableId + 'Wrapper');
     if (!wrapper) return;
-    const table = wrapper.querySelector('table');
-    if (table) {
-        table.style.transform = `scale(${zoomLevels[tableId]})`;
-        table.style.transformOrigin = 'top left';
+    const inner = wrapper.querySelector('.table-inner');
+    if (inner) {
+        inner.style.transform = `scale(${zoomLevels[tableId]})`;
+        inner.style.transformOrigin = 'top left';
     }
 }
 
 // ============ TABLE 1: Fixed/Editable Table ============
 function renderTable1() {
-    const table = document.getElementById('table1');
-    table.innerHTML = '';
+    const wrapper = document.getElementById('table1Wrapper');
+    wrapper.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'table-inner';
+    const table = document.createElement('table');
+    table.id = 'table1';
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'Row';
+    rowNumTh.textContent = 'No.';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -96,6 +97,8 @@ function renderTable1() {
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+    inner.appendChild(table);
+    wrapper.appendChild(inner);
 }
 
 function editCell(ri, ci, td) {
@@ -240,15 +243,19 @@ function findSquares(position, digits) {
 
 // ============ TABLE 2: Search Results ============
 function renderTable2() {
-    const table = document.getElementById('table2');
-    table.innerHTML = '';
+    const wrapper = document.getElementById('table2Wrapper');
+    wrapper.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'table-inner';
+    const table = document.createElement('table');
+    table.id = 'table2';
 
     const highlightMap = buildHighlightMap();
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'Row';
+    rowNumTh.textContent = 'No.';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -271,7 +278,6 @@ function renderTable2() {
         row.forEach((cell, ci) => {
             const td = document.createElement('td');
             td.textContent = cell;
-
             const key = `${ri}-${ci}`;
             if (highlightMap[key]) {
                 td.className = `highlight-${highlightMap[key]}`;
@@ -281,6 +287,8 @@ function renderTable2() {
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+    inner.appendChild(table);
+    wrapper.appendChild(inner);
 }
 
 function buildHighlightMap() {
@@ -303,17 +311,20 @@ function buildHighlightMap() {
 
 // ============ TABLE 3: Gap Calculation Left to Right ============
 function renderTable3() {
-    const table = document.getElementById('table3');
-    table.innerHTML = '';
+    const wrapper = document.getElementById('table3Wrapper');
+    wrapper.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'table-inner';
+    const table = document.createElement('table');
+    table.id = 'table3';
 
-    const highlightMap = buildHighlightMap();
     const connections = calculateGapConnectionsLTR();
     const connectionCells = buildConnectionCellMap(connections);
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'Row';
+    rowNumTh.textContent = 'No.';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -342,33 +353,35 @@ function renderTable3() {
             const key = `${ri}-${ci}`;
             if (connectionCells[key]) {
                 td.className = `highlight-${connectionCells[key]}`;
-            } else if (highlightMap[key]) {
-                // Only show highlight if part of a valid connection
-                // Keep original style (no highlight) if not connected
             }
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+    inner.appendChild(table);
+    wrapper.appendChild(inner);
 
-    // Draw blue lines
-    setTimeout(() => drawConnectionLines('table3Wrapper', table, connections), 150);
+    // Draw blue lines after render
+    setTimeout(() => drawConnectionLines(wrapper, table, connections), 200);
 }
 
 // ============ TABLE 4: Gap Calculation Right to Left ============
 function renderTable4() {
-    const table = document.getElementById('table4');
-    table.innerHTML = '';
+    const wrapper = document.getElementById('table4Wrapper');
+    wrapper.innerHTML = '';
+    const inner = document.createElement('div');
+    inner.className = 'table-inner';
+    const table = document.createElement('table');
+    table.id = 'table4';
 
-    const highlightMap = buildHighlightMap();
     const connections = calculateGapConnectionsRTL();
     const connectionCells = buildConnectionCellMap(connections);
 
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'Row';
+    rowNumTh.textContent = 'No.';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -403,11 +416,18 @@ function renderTable4() {
         tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+    inner.appendChild(table);
+    wrapper.appendChild(inner);
 
-    setTimeout(() => drawConnectionLines('table4Wrapper', table, connections), 150);
+    setTimeout(() => drawConnectionLines(wrapper, table, connections), 200);
 }
 
 // ============ GAP CALCULATION: LEFT TO RIGHT ============
+// Logic: Start from leftmost column (col 69), scan left to right
+// Find yellow first, then find green after it, calculate row gap
+// If gap goes beyond 24 rows, continue to next column
+// Then find red at same gap from green
+// Only show connection if yellow→green gap == green→red gap
 function calculateGapConnectionsLTR() {
     if (!searchResults || searchResults.highlights.length < 3) return [];
 
@@ -417,34 +437,28 @@ function calculateGapConnectionsLTR() {
     const redSquares = searchResults.highlights[2].squares;
     const numRows = tableData.length; // 24
 
-    // Sort squares by column (left to right), then by startRow
-    const sortLTR = (a, b) => a.col !== b.col ? a.col - b.col : a.startRow - b.startRow;
-    const sortedYellow = [...yellowSquares].sort(sortLTR);
-    const sortedGreen = [...greenSquares].sort(sortLTR);
-    const sortedRed = [...redSquares].sort(sortLTR);
+    // Linear position for LTR: col_index * 24 + startRow
+    // This allows gap to span across columns
+    yellowSquares.forEach(yellow => {
+        const yellowLinear = yellow.col * numRows + yellow.startRow;
 
-    // For each yellow square, look for green squares to the right (or same column, below)
-    sortedYellow.forEach(yellow => {
-        sortedGreen.forEach(green => {
-            // Green must be to the right of or after yellow (LTR)
-            // Calculate linear position: col * numRows + startRow
-            const yellowLinear = yellow.col * numRows + yellow.startRow;
+        greenSquares.forEach(green => {
             const greenLinear = green.col * numRows + green.startRow;
-            const gap = greenLinear - yellowLinear;
+            const gapYG = greenLinear - yellowLinear;
 
-            if (gap <= 0) return;
+            if (gapYG <= 0) return; // green must come after yellow
 
-            // Now find red at same gap from green
-            sortedRed.forEach(red => {
+            // Find red at same gap from green
+            redSquares.forEach(red => {
                 const redLinear = red.col * numRows + red.startRow;
-                const gapGreenRed = redLinear - greenLinear;
+                const gapGR = redLinear - greenLinear;
 
-                if (gap === gapGreenRed) {
+                if (gapYG === gapGR) {
                     connections.push({
                         yellow: yellow,
                         green: green,
                         red: red,
-                        gap: gap
+                        gap: gapYG
                     });
                 }
             });
@@ -455,6 +469,8 @@ function calculateGapConnectionsLTR() {
 }
 
 // ============ GAP CALCULATION: RIGHT TO LEFT ============
+// Logic: Start from rightmost column (col 26), scan right to left
+// Same gap logic but reversed direction
 function calculateGapConnectionsRTL() {
     if (!searchResults || searchResults.highlights.length < 3) return [];
 
@@ -465,37 +481,27 @@ function calculateGapConnectionsRTL() {
     const numRows = tableData.length; // 24
     const numCols = headers.length;
 
-    // For RTL, we reverse the column order for linear position
-    // rightmost column = position 0
-    const sortRTL = (a, b) => {
-        const aPos = (numCols - 1 - a.col) * numRows + a.startRow;
-        const bPos = (numCols - 1 - b.col) * numRows + b.startRow;
-        return aPos - bPos;
-    };
-
-    const sortedYellow = [...yellowSquares].sort(sortRTL);
-    const sortedGreen = [...greenSquares].sort(sortRTL);
-    const sortedRed = [...redSquares].sort(sortRTL);
-
-    sortedYellow.forEach(yellow => {
+    // Linear position for RTL: (numCols - 1 - col_index) * 24 + startRow
+    // Rightmost column gets position 0, leftmost gets highest position
+    yellowSquares.forEach(yellow => {
         const yellowLinear = (numCols - 1 - yellow.col) * numRows + yellow.startRow;
 
-        sortedGreen.forEach(green => {
+        greenSquares.forEach(green => {
             const greenLinear = (numCols - 1 - green.col) * numRows + green.startRow;
-            const gap = greenLinear - yellowLinear;
+            const gapYG = greenLinear - yellowLinear;
 
-            if (gap <= 0) return;
+            if (gapYG <= 0) return;
 
-            sortedRed.forEach(red => {
+            redSquares.forEach(red => {
                 const redLinear = (numCols - 1 - red.col) * numRows + red.startRow;
-                const gapGreenRed = redLinear - greenLinear;
+                const gapGR = redLinear - greenLinear;
 
-                if (gap === gapGreenRed) {
+                if (gapYG === gapGR) {
                     connections.push({
                         yellow: yellow,
                         green: green,
                         red: red,
-                        gap: gap
+                        gap: gapYG
                     });
                 }
             });
@@ -506,6 +512,8 @@ function calculateGapConnectionsRTL() {
 }
 
 // ============ BUILD CONNECTION CELL MAP ============
+// Only cells that are part of valid connections get colored
+// If no valid connection, cells stay uncolored (original)
 function buildConnectionCellMap(connections) {
     const map = {};
 
@@ -521,9 +529,7 @@ function buildConnectionCellMap(connections) {
 }
 
 // ============ DRAW BLUE CONNECTION LINES ============
-function drawConnectionLines(wrapperId, table, connections) {
-    const wrapper = document.getElementById(wrapperId);
-
+function drawConnectionLines(wrapper, table, connections) {
     // Remove existing SVG
     const existingSvg = wrapper.querySelector('.svg-overlay');
     if (existingSvg) existingSvg.remove();
@@ -538,38 +544,35 @@ function drawConnectionLines(wrapperId, table, connections) {
     svg.style.width = table.scrollWidth + 'px';
     svg.style.height = table.scrollHeight + 'px';
     svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '5';
+    svg.style.zIndex = '15';
     svg.setAttribute('width', table.scrollWidth);
     svg.setAttribute('height', table.scrollHeight);
 
     const tableRect = table.getBoundingClientRect();
 
     connections.forEach(conn => {
-        // Get middle cell of each square (row+1 of the 3)
+        // Get the middle cell of each 3-row square (startRow + 1)
         const yellowCell = getTableCell(table, conn.yellow.startRow + 1, conn.yellow.col);
         const greenCell = getTableCell(table, conn.green.startRow + 1, conn.green.col);
         const redCell = getTableCell(table, conn.red.startRow + 1, conn.red.col);
 
         if (yellowCell && greenCell) {
-            const line = createSvgLine(yellowCell, greenCell, tableRect);
-            svg.appendChild(line);
+            svg.appendChild(createSvgLine(yellowCell, greenCell, tableRect));
         }
         if (greenCell && redCell) {
-            const line = createSvgLine(greenCell, redCell, tableRect);
-            svg.appendChild(line);
+            svg.appendChild(createSvgLine(greenCell, redCell, tableRect));
         }
     });
 
-    wrapper.style.position = 'relative';
-    wrapper.appendChild(svg);
+    wrapper.querySelector('.table-inner').style.position = 'relative';
+    wrapper.querySelector('.table-inner').appendChild(svg);
 }
 
 function getTableCell(table, rowIdx, colIdx) {
-    // rowIdx is 0-based data row, colIdx is 0-based column
     const rows = table.querySelectorAll('tbody tr');
     if (rowIdx < 0 || rowIdx >= rows.length) return null;
     const cells = rows[rowIdx].querySelectorAll('td');
-    // cells[0] is row number, cells[1] is first data column
+    // cells[0] is row number, cells[colIdx+1] is the data cell
     if (colIdx + 1 >= cells.length) return null;
     return cells[colIdx + 1];
 }
@@ -590,14 +593,7 @@ function createSvgLine(cell1, cell2, tableRect) {
     line.setAttribute('y2', y2);
     line.setAttribute('stroke', '#007bff');
     line.setAttribute('stroke-width', '3');
-    line.setAttribute('stroke-opacity', '0.85');
+    line.setAttribute('stroke-opacity', '0.9');
     line.setAttribute('stroke-linecap', 'round');
     return line;
 }
-
-// Enter key support for search
-document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('searchInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') performSearch();
-    });
-});
