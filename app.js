@@ -2,7 +2,7 @@
 let tableData = JSON.parse(JSON.stringify(TABLE_DATA));
 let headers = [...TABLE_HEADERS];
 let searchResults = null;
-let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1 };
+let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1, table5: 1 };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ============ ZOOM FEATURE ============
 function setupZoom() {
-    ['table1Wrapper', 'table2Wrapper', 'table3Wrapper', 'table4Wrapper'].forEach(id => {
+    ['table1Wrapper', 'table2Wrapper', 'table3Wrapper', 'table4Wrapper', 'table5Wrapper'].forEach(id => {
         const wrapper = document.getElementById(id);
         if (!wrapper) return;
         wrapper.addEventListener('wheel', (e) => {
@@ -151,9 +151,16 @@ function performSearch() {
     const input = document.getElementById('searchInput').value.trim();
     if (!input) return;
 
+    // Check if it's a Probably Table search (Xp=DIGITS)
+    const probMatch = input.match(/^(\d+)p=(.+)$/i);
+    if (probMatch) {
+        performProbablySearch(parseInt(probMatch[1]), probMatch[2]);
+        return;
+    }
+
     const parsed = parseSearchInput(input);
     if (!parsed) {
-        alert('Invalid format. Use: top134,334,789 or middle245,751,359 or last356,280,103');
+        alert('Invalid format. Use: top134,334,789 or middle245,751,359 or last356,280,103 or 0p=246');
         return;
     }
 
@@ -179,6 +186,7 @@ function performSearch() {
     document.getElementById('table2Section').style.display = 'block';
     document.getElementById('table3Section').style.display = 'block';
     document.getElementById('table4Section').style.display = 'block';
+    document.getElementById('table5Section').style.display = 'none';
 
     renderTable2();
     renderTable3();
@@ -596,4 +604,259 @@ function createSvgLine(cell1, cell2, tableRect) {
     line.setAttribute('stroke-opacity', '0.9');
     line.setAttribute('stroke-linecap', 'round');
     return line;
+}
+
+// ============ PROBABLY TABLE ============
+// Search format: Xp=DIGITS
+// X = gap (0=adjacent rows, 1=1 row gap between each, etc.)
+// DIGITS = sequence of digits to find (3-4 digits)
+// 0p=246: find 2 in row1, 4 in row2, 6 in row3 (adjacent)
+// 1p=246: find 2 in row1, 4 in row3, 6 in row5 (1 row gap)
+// Must find ALL digits to show result (if only partial, don't show)
+// Column overflow: if rows run out, continue to next column row1
+
+function performProbablySearch(gap, digitsStr) {
+    const digits = digitsStr.split('').map(Number);
+    if (digits.length < 3 || digits.some(isNaN)) {
+        alert('Invalid digits. Use at least 3 digits (e.g. 0p=246 or 1p=4567)');
+        return;
+    }
+
+    // Hide other tables, show probably table
+    document.getElementById('table2Section').style.display = 'none';
+    document.getElementById('table3Section').style.display = 'none';
+    document.getElementById('table4Section').style.display = 'none';
+    document.getElementById('table5Section').style.display = 'block';
+
+    const numRows = tableData.length; // 24
+    const numCols = headers.length;
+    const totalCells = numRows * numCols;
+    const step = gap + 1; // 0p = step 1 (adjacent), 1p = step 2, etc.
+
+    const results = []; // Each result: array of {col, row, digit, cellValue}
+
+    // Scan every starting position (linear: col*24 + row)
+    for (let startLinear = 0; startLinear < totalCells; startLinear++) {
+        const sequence = [];
+        let valid = true;
+
+        for (let d = 0; d < digits.length; d++) {
+            const linearPos = startLinear + d * step;
+            if (linearPos >= totalCells) {
+                valid = false;
+                break;
+            }
+
+            const col = Math.floor(linearPos / numRows);
+            const row = linearPos % numRows;
+
+            if (col >= numCols) {
+                valid = false;
+                break;
+            }
+
+            const cellValue = tableData[row][col];
+            if (!cellValue || cellValue.length < 3) {
+                valid = false;
+                break;
+            }
+
+            // Check if digit exists in any position of the 3-digit number
+            const cellDigits = cellValue.split('').map(Number);
+            if (!cellDigits.includes(digits[d])) {
+                valid = false;
+                break;
+            }
+
+            sequence.push({ col, row, digit: digits[d], cellValue });
+        }
+
+        if (valid && sequence.length === digits.length) {
+            results.push(sequence);
+        }
+    }
+
+    renderProbablyTable(results, gap, digits);
+}
+
+function renderProbablyTable(results, gap, digits) {
+    const inner = document.getElementById('table5Inner');
+    inner.innerHTML = '';
+
+    if (results.length === 0) {
+        inner.innerHTML = '<p style="color:#fbbf24;padding:20px;">No probably patterns found for this search.</p>';
+        return;
+    }
+
+    // Build a full table showing all data with highlights and curved arrows
+    const numRows = tableData.length;
+    const numCols = headers.length;
+
+    // Build highlight map: key = "row-col" => color
+    const highlightMap = {};
+    const arrowPairs = []; // [{from: {row,col}, to: {row,col}, colorIdx}]
+
+    const pairColors = ['#fbbf24', '#22c55e', '#ef4444', '#3b82f6', '#a855f7', '#f97316', '#06b6d4', '#ec4899'];
+
+    results.forEach((seq, seqIdx) => {
+        const colorIdx = seqIdx % pairColors.length;
+        seq.forEach((item, itemIdx) => {
+            const key = `${item.row}-${item.col}`;
+            if (!highlightMap[key]) {
+                highlightMap[key] = colorIdx;
+            }
+            // Draw arrows between consecutive items in the sequence
+            if (itemIdx > 0) {
+                arrowPairs.push({
+                    from: { row: seq[itemIdx - 1].row, col: seq[itemIdx - 1].col },
+                    to: { row: item.row, col: item.col },
+                    colorIdx: colorIdx
+                });
+            }
+        });
+    });
+
+    // Create table
+    const table = document.createElement('table');
+    table.id = 'probTable';
+    table.className = 'data-table';
+
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const rowNumTh = document.createElement('th');
+    rowNumTh.textContent = 'No.';
+    rowNumTh.className = 'row-number';
+    headerRow.appendChild(rowNumTh);
+
+    headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    for (let ri = 0; ri < numRows; ri++) {
+        const tr = document.createElement('tr');
+        const rowNumTd = document.createElement('td');
+        rowNumTd.className = 'row-number';
+        rowNumTd.textContent = ri + 1;
+        tr.appendChild(rowNumTd);
+
+        for (let ci = 0; ci < numCols; ci++) {
+            const td = document.createElement('td');
+            td.textContent = tableData[ri][ci];
+            td.id = `prob-cell-${ri}-${ci}`;
+
+            const key = `${ri}-${ci}`;
+            if (highlightMap[key] !== undefined) {
+                const cIdx = highlightMap[key];
+                td.style.backgroundColor = pairColors[cIdx];
+                td.style.color = '#000';
+                td.style.fontWeight = 'bold';
+            }
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    inner.appendChild(table);
+
+    // Info text
+    const info = document.createElement('div');
+    info.style.padding = '10px';
+    info.style.color = '#aaa';
+    info.innerHTML = `<strong style="color:#fbbf24">Probably Table</strong> | Gap: ${gap}p | Digits: ${digits.join('')} | Found: ${results.length} pattern(s)`;
+    inner.insertBefore(info, table);
+
+    // Draw curved arrows after render
+    setTimeout(() => drawProbablyArrows(arrowPairs, table, pairColors), 200);
+}
+
+function drawProbablyArrows(arrowPairs, table, pairColors) {
+    const inner = document.getElementById('table5Inner');
+    if (!inner || !table) return;
+
+    // Remove existing SVG
+    const existing = inner.querySelector('.svg-overlay');
+    if (existing) existing.remove();
+
+    if (arrowPairs.length === 0) return;
+
+    const w = table.scrollWidth;
+    const h = table.scrollHeight;
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.classList.add('svg-overlay');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = w + 'px';
+    svg.style.height = h + 'px';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '15';
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+
+    // Arrowhead markers
+    const defs = document.createElementNS(svgNS, 'defs');
+    pairColors.forEach((col, i) => {
+        const marker = document.createElementNS(svgNS, 'marker');
+        marker.setAttribute('id', 'prob-arr-' + i);
+        marker.setAttribute('markerWidth', '8');
+        marker.setAttribute('markerHeight', '8');
+        marker.setAttribute('refX', '6');
+        marker.setAttribute('refY', '3');
+        marker.setAttribute('orient', 'auto');
+        marker.setAttribute('markerUnits', 'strokeWidth');
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+        path.setAttribute('fill', col);
+        marker.appendChild(path);
+        defs.appendChild(marker);
+    });
+    svg.appendChild(defs);
+
+    const tableRect = table.getBoundingClientRect();
+
+    arrowPairs.forEach(pair => {
+        const cellA = document.getElementById(`prob-cell-${pair.from.row}-${pair.from.col}`);
+        const cellB = document.getElementById(`prob-cell-${pair.to.row}-${pair.to.col}`);
+        if (!cellA || !cellB) return;
+
+        const rA = cellA.getBoundingClientRect();
+        const rB = cellB.getBoundingClientRect();
+
+        const x1 = rA.left - tableRect.left + rA.width / 2;
+        const y1 = rA.top - tableRect.top + rA.height / 2;
+        const x2 = rB.left - tableRect.left + rB.width / 2;
+        const y2 = rB.top - tableRect.top + rB.height / 2;
+
+        // Curved arrow (bezier)
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const bend = Math.min(80, Math.max(30, dist * 0.3));
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const px = -dy / (dist || 1);
+        const py = dx / (dist || 1);
+        const cx = mx + px * bend;
+        const cy = my + py * bend;
+
+        const colorIdx = pair.colorIdx;
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', pairColors[colorIdx]);
+        path.setAttribute('stroke-width', '2');
+        path.setAttribute('stroke-opacity', '0.8');
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('marker-end', `url(#prob-arr-${colorIdx})`);
+        svg.appendChild(path);
+    });
+
+    inner.style.position = 'relative';
+    inner.appendChild(svg);
 }

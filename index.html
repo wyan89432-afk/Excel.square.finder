@@ -13,11 +13,12 @@
         <!-- Search Bar -->
         <div class="search-section">
             <label for="searchInput">Search:</label>
-            <input type="text" id="searchInput" placeholder="e.g. top134,334,789 or middle245,751,359 or last356,280,103">
+            <input type="text" id="searchInput" placeholder="e.g. top134,334,789 or 0p=246 or 1p=4567">
             <button id="searchBtn" onclick="performSearch()">Search</button>
             <div class="search-help">
-                <small>Format: top/middle/last + 3 digits (comma separated for multiple). top=first digit, middle=second digit, last=third digit.<br>
-                Colors: 1st=Yellow, 2nd=Green, 3rd=Red | Ctrl+Scroll to zoom tables</small>
+                <small>Format: top/middle/last + 3 digits (comma separated) OR Xp=DIGITS for Probably Table.<br>
+                top=first digit, middle=second, last=third | Xp=gap (0p=adjacent, 1p=1 row gap) | Colors: Yellow/Green/Red<br>
+                Ctrl+Scroll to zoom tables</small>
             </div>
         </div>
 
@@ -81,6 +82,22 @@
             </div>
             <div class="table-wrapper" id="table4Wrapper">
                 <table id="table4"></table>
+            </div>
+        </div>
+
+        <!-- Table 5: Probably Table -->
+        <div class="table-section" id="table5Section" style="display:none;">
+            <h2>Table-5: Probably Table</h2>
+            <p class="table-desc">Search format: Xp=DIGITS (e.g. 0p=246, 1p=4567). X=row gap (0-100). Finds digit sequences across rows with specified gap.</p>
+            <div class="table-controls">
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table5')">−</button>
+                    <button onclick="zoomReset('table5')">Reset</button>
+                    <button onclick="zoomIn('table5')">+</button>
+                </div>
+            </div>
+            <div class="table-wrapper" id="table5Wrapper">
+                <div class="table-inner" id="table5Inner"></div>
             </div>
         </div>
     </div>
