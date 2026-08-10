@@ -2,7 +2,7 @@
 let tableData = JSON.parse(JSON.stringify(TABLE_DATA));
 let headers = [...TABLE_HEADERS];
 let searchResults = null;
-let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1, table5: 1 };
+let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1, table5: 1, table6: 1 };
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ============ ZOOM FEATURE ============
 function setupZoom() {
-    ['table1Wrapper', 'table2Wrapper', 'table3Wrapper', 'table4Wrapper', 'table5Wrapper'].forEach(id => {
+    ['table1Wrapper', 'table2Wrapper', 'table3Wrapper', 'table4Wrapper', 'table5Wrapper', 'table6Wrapper'].forEach(id => {
         const wrapper = document.getElementById(id);
         if (!wrapper) return;
         wrapper.addEventListener('wheel', (e) => {
@@ -150,6 +150,13 @@ function addColumn() {
 function performSearch() {
     const input = document.getElementById('searchInput').value.trim();
     if (!input) return;
+
+    // Check if it's an All Table search (All=123,456,...)
+    const allMatch = input.match(/^all=(.+)$/i);
+    if (allMatch) {
+        performAllSearch(allMatch[1]);
+        return;
+    }
 
     // Check if it's a Probably Table search (Xp=DIGITS)
     const probMatch = input.match(/^(\d+)p=(.+)$/i);
@@ -857,6 +864,343 @@ function drawProbablyArrows(arrowPairs, table, pairColors) {
         svg.appendChild(path);
     });
 
+    inner.style.position = 'relative';
+    inner.appendChild(svg);
+}
+
+// ============ ALL TABLE ============
+// Search format: All=123,456,489 (minimum 2 numbers, comma separated)
+// Logic:
+// 1. Each number (e.g. 123) represents a cell value to find in the fix table
+// 2. Find which ROW each number is in (search entire fix table)
+// 3. From those rows, extract:
+//    - Hundreds digits (first digit of each cell in those rows) → form a 3-digit combo
+//    - Tens digits (second digit) → form a 3-digit combo  
+//    - Last digits (third digit) → form a 3-digit combo
+// 4. Search the fix table for cells containing those digit combos (permutations)
+// 5. Display results with yellow highlight on the searched rows
+
+function performAllSearch(numbersStr) {
+    const numbers = numbersStr.split(',').map(s => s.trim()).filter(s => s.length === 3 && /^\d{3}$/.test(s));
+    
+    if (numbers.length < 2) {
+        alert('All Table: အနည်းဆုံး ဂဏန်း 2 ခု လိုအပ်ပါသည်။ (e.g. All=495,214)');
+        return;
+    }
+    
+    // Hide other result tables, show All Table
+    document.getElementById('table2Section').style.display = 'none';
+    document.getElementById('table3Section').style.display = 'none';
+    document.getElementById('table4Section').style.display = 'none';
+    document.getElementById('table5Section').style.display = 'none';
+    document.getElementById('table6Section').style.display = 'block';
+    
+    const numRows = tableData.length;
+    const numCols = headers.length;
+    
+    // Find which rows contain each search number
+    const searchRows = []; // array of {number, row, col} for each found number
+    for (const num of numbers) {
+        let found = false;
+        for (let r = 0; r < numRows && !found; r++) {
+            for (let c = 0; c < numCols && !found; c++) {
+                if (tableData[r][c] === num) {
+                    searchRows.push({ number: num, row: r, col: c });
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            // Number not found in table, still add with row -1
+            searchRows.push({ number: num, row: -1, col: -1 });
+        }
+    }
+    
+    // Get the rows that were found
+    const validRows = searchRows.filter(sr => sr.row >= 0);
+    if (validRows.length < 2) {
+        const inner = document.getElementById('table6Inner');
+        inner.innerHTML = '<p style="color:#fbbf24;padding:20px;">ရှာဖွေသော ဂဏန်းများ fix table တွင် မတွေ့ပါ။</p>';
+        return;
+    }
+    
+    // For each column in the fix table, extract digits from the found rows
+    // Then search for those digit combinations
+    const results = []; // {col, hundreds: string, tens: string, lasts: string, foundCells: [{row, col, type}]}
+    const highlightMap = {}; // "row-col" => color
+    const rowHighlights = {}; // rows to highlight yellow
+    
+    // Mark the search rows as yellow
+    validRows.forEach(vr => {
+        rowHighlights[vr.row] = true;
+    });
+    
+    // For each column, extract the digits from the valid rows
+    const allFoundCells = [];
+    
+    for (let c = 0; c < numCols; c++) {
+        const hundredsDigits = [];
+        const tensDigits = [];
+        const lastDigits = [];
+        
+        for (const vr of validRows) {
+            const cellVal = tableData[vr.row][c];
+            if (cellVal && cellVal.length >= 3) {
+                hundredsDigits.push(cellVal[0]);
+                tensDigits.push(cellVal[1]);
+                lastDigits.push(cellVal[2]);
+            }
+        }
+        
+        if (hundredsDigits.length < 2) continue;
+        
+        // Form the digit combos (e.g., for 3 rows: "142" from hundreds)
+        const hundredsCombo = hundredsDigits.join('');
+        const tensCombo = tensDigits.join('');
+        const lastCombo = lastDigits.join('');
+        
+        // Generate permutations for each combo and search the entire table
+        const hundredsPerms = getPermutations3(hundredsCombo);
+        const tensPerms = getPermutations3(tensCombo);
+        const lastPerms = getPermutations3(lastCombo);
+        
+        // Search entire table for these permutations
+        for (let sr = 0; sr < numRows; sr++) {
+            for (let sc = 0; sc < numCols; sc++) {
+                const val = tableData[sr][sc];
+                if (!val || val.length < 3) continue;
+                
+                if (hundredsPerms.includes(val)) {
+                    allFoundCells.push({ row: sr, col: sc, type: 'hundreds', sourceCol: c, combo: hundredsCombo });
+                }
+                if (tensPerms.includes(val)) {
+                    allFoundCells.push({ row: sr, col: sc, type: 'tens', sourceCol: c, combo: tensCombo });
+                }
+                if (lastPerms.includes(val)) {
+                    allFoundCells.push({ row: sr, col: sc, type: 'lasts', sourceCol: c, combo: lastCombo });
+                }
+            }
+        }
+    }
+    
+    // Build highlight map
+    // Yellow for search rows (entire row)
+    for (let r = 0; r < numRows; r++) {
+        if (rowHighlights[r]) {
+            for (let c = 0; c < numCols; c++) {
+                highlightMap[`${r}-${c}`] = 'yellow';
+            }
+        }
+    }
+    
+    // Green for found cells
+    allFoundCells.forEach(fc => {
+        const key = `${fc.row}-${fc.col}`;
+        if (!highlightMap[key]) {
+            highlightMap[key] = 'green';
+        }
+    });
+    
+    renderAllTable(highlightMap, validRows, allFoundCells, numbers);
+}
+
+function getPermutations3(str) {
+    // Get all unique permutations of a string of digits (length 2-4)
+    const perms = new Set();
+    const chars = str.split('');
+    
+    if (chars.length === 2) {
+        perms.add(chars[0] + chars[1]);
+        perms.add(chars[1] + chars[0]);
+        return Array.from(perms);
+    }
+    
+    if (chars.length === 3) {
+        for (let i = 0; i < 3; i++) {
+            for (let j = 0; j < 3; j++) {
+                if (j === i) continue;
+                for (let k = 0; k < 3; k++) {
+                    if (k === i || k === j) continue;
+                    perms.add(chars[i] + chars[j] + chars[k]);
+                }
+            }
+        }
+        return Array.from(perms);
+    }
+    
+    if (chars.length === 4) {
+        for (let i = 0; i < 4; i++) {
+            for (let j = 0; j < 4; j++) {
+                if (j === i) continue;
+                for (let k = 0; k < 4; k++) {
+                    if (k === i || k === j) continue;
+                    // Take 3 at a time from 4 digits
+                    perms.add(chars[i] + chars[j] + chars[k]);
+                }
+            }
+        }
+        return Array.from(perms);
+    }
+    
+    // For other lengths, just return the string itself
+    perms.add(str);
+    return Array.from(perms);
+}
+
+function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
+    const inner = document.getElementById('table6Inner');
+    inner.innerHTML = '';
+    
+    const numRows = tableData.length;
+    const numCols = headers.length;
+    
+    // Info header
+    const info = document.createElement('div');
+    info.style.padding = '10px';
+    info.style.color = '#aaa';
+    info.innerHTML = `<strong style="color:#fbbf24">All Table</strong> | Search: ${searchNumbers.join(', ')} | ` +
+        `Rows found: ${validRows.map(v => 'R' + (v.row + 1)).join(', ')} | ` +
+        `Matches: ${foundCells.length}`;
+    inner.appendChild(info);
+    
+    // Create table
+    const table = document.createElement('table');
+    table.id = 'allTable';
+    table.className = 'data-table';
+    
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    const rowNumTh = document.createElement('th');
+    rowNumTh.textContent = 'No.';
+    rowNumTh.className = 'row-number';
+    headerRow.appendChild(rowNumTh);
+    
+    headers.forEach(h => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+    
+    const tbody = document.createElement('tbody');
+    for (let ri = 0; ri < numRows; ri++) {
+        const tr = document.createElement('tr');
+        const rowNumTd = document.createElement('td');
+        rowNumTd.className = 'row-number';
+        rowNumTd.textContent = ri + 1;
+        tr.appendChild(rowNumTd);
+        
+        for (let ci = 0; ci < numCols; ci++) {
+            const td = document.createElement('td');
+            td.textContent = tableData[ri][ci];
+            td.id = `all-cell-${ri}-${ci}`;
+            
+            const key = `${ri}-${ci}`;
+            if (highlightMap[key] === 'yellow') {
+                td.className = 'highlight-yellow';
+            } else if (highlightMap[key] === 'green') {
+                td.className = 'highlight-green';
+            }
+            tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+    inner.appendChild(table);
+    
+    // Draw curved arrows connecting found cells
+    setTimeout(() => drawAllTableArrows(inner, table, validRows, foundCells), 200);
+}
+
+function drawAllTableArrows(inner, table, validRows, foundCells) {
+    const existing = inner.querySelector('.svg-overlay');
+    if (existing) existing.remove();
+    
+    if (foundCells.length === 0) return;
+    
+    const w = table.scrollWidth;
+    const h = table.scrollHeight;
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.classList.add('svg-overlay');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = w + 'px';
+    svg.style.height = h + 'px';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '15';
+    svg.setAttribute('width', w);
+    svg.setAttribute('height', h);
+    
+    // Arrowhead
+    const defs = document.createElementNS(svgNS, 'defs');
+    const marker = document.createElementNS(svgNS, 'marker');
+    marker.setAttribute('id', 'all-arr');
+    marker.setAttribute('markerWidth', '8');
+    marker.setAttribute('markerHeight', '8');
+    marker.setAttribute('refX', '6');
+    marker.setAttribute('refY', '3');
+    marker.setAttribute('orient', 'auto');
+    const markerPath = document.createElementNS(svgNS, 'path');
+    markerPath.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
+    markerPath.setAttribute('fill', '#00ff00');
+    marker.appendChild(markerPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    
+    const tableRect = table.getBoundingClientRect();
+    
+    // Draw arrows from each valid row's cell to the found cell
+    // Group by sourceCol to avoid too many arrows
+    const drawnPairs = new Set();
+    
+    foundCells.forEach(fc => {
+        // Connect from the source column in the search row to the found cell
+        const sourceRow = validRows[0].row; // use first search row as source
+        const sourceKey = `${sourceRow}-${fc.sourceCol}`;
+        const targetKey = `${fc.row}-${fc.col}`;
+        const pairKey = sourceKey + '->' + targetKey;
+        
+        if (drawnPairs.has(pairKey)) return;
+        drawnPairs.add(pairKey);
+        
+        const cellA = document.getElementById(`all-cell-${sourceRow}-${fc.sourceCol}`);
+        const cellB = document.getElementById(`all-cell-${fc.row}-${fc.col}`);
+        if (!cellA || !cellB) return;
+        
+        const rA = cellA.getBoundingClientRect();
+        const rB = cellB.getBoundingClientRect();
+        
+        const x1 = rA.left - tableRect.left + rA.width / 2;
+        const y1 = rA.top - tableRect.top + rA.height / 2;
+        const x2 = rB.left - tableRect.left + rB.width / 2;
+        const y2 = rB.top - tableRect.top + rB.height / 2;
+        
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist === 0) return;
+        
+        const bend = Math.min(60, Math.max(20, dist * 0.25));
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        const px = -dy / dist;
+        const py = dx / dist;
+        const cx = mx + px * bend;
+        const cy = my + py * bend;
+        
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', '#00ff00');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('stroke-opacity', '0.7');
+        path.setAttribute('marker-end', 'url(#all-arr)');
+        svg.appendChild(path);
+    });
+    
     inner.style.position = 'relative';
     inner.appendChild(svg);
 }

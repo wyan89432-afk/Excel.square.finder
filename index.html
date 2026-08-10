@@ -13,12 +13,12 @@
         <!-- Search Bar -->
         <div class="search-section">
             <label for="searchInput">Search:</label>
-            <input type="text" id="searchInput" placeholder="e.g. top134,334,789 or 0p=246 or 1p=4567">
+            <input type="text" id="searchInput" placeholder="e.g. top134,334,789 or 0p=246 or All=123,456">
             <button id="searchBtn" onclick="performSearch()">Search</button>
             <div class="search-help">
-                <small>Format: top/middle/last + 3 digits (comma separated) OR Xp=DIGITS for Probably Table.<br>
-                top=first digit, middle=second, last=third | Xp=gap (0p=adjacent, 1p=1 row gap) | Colors: Yellow/Green/Red<br>
-                Ctrl+Scroll to zoom tables</small>
+                <small>Format: top/middle/last + 3 digits | Xp=DIGITS for Probably Table | All=123,456 for All Table<br>
+                top=first digit, middle=second, last=third | Xp=gap (0p=adjacent, 1p=1 row gap)<br>
+                All=numbers (min 2): searches hundreds/tens/last digits across rows | Ctrl+Scroll to zoom</small>
             </div>
         </div>
 
@@ -82,6 +82,22 @@
             </div>
             <div class="table-wrapper" id="table4Wrapper">
                 <table id="table4"></table>
+            </div>
+        </div>
+
+        <!-- Table 6: All Table -->
+        <div class="table-section" id="table6Section" style="display:none;">
+            <h2>Table-6: All Table</h2>
+            <p class="table-desc">Search format: All=123,456,489 (min 2 numbers). Finds hundreds/tens/last digit combinations across specified rows.</p>
+            <div class="table-controls">
+                <div class="zoom-controls">
+                    <button onclick="zoomOut('table6')">−</button>
+                    <button onclick="zoomReset('table6')">Reset</button>
+                    <button onclick="zoomIn('table6')">+</button>
+                </div>
+            </div>
+            <div class="table-wrapper" id="table6Wrapper">
+                <div class="table-inner" id="table6Inner"></div>
             </div>
         </div>
 
