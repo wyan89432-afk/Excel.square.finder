@@ -924,9 +924,9 @@ function performAllSearch(numbersStr) {
         return;
     }
     
-    // For each column in the fix table, extract digits from the found rows
-    // Then search for those digit combinations
-    const results = []; // {col, hundreds: string, tens: string, lasts: string, foundCells: [{row, col, type}]}
+    // For each column, extract digits from the found rows
+    // When rows exceed 24, wrap to next column (linear position)
+    // e.g. col 86 row 23 -> col 87 row 1
     const highlightMap = {}; // "row-col" => color
     const rowHighlights = {}; // rows to highlight yellow
     
@@ -935,31 +935,50 @@ function performAllSearch(numbersStr) {
         rowHighlights[vr.row] = true;
     });
     
-    // For each column, extract the digits from the valid rows
-    const allFoundCells = [];
+    // Convert row positions to linear positions for wrap-around
+    // Linear = col * numRows + row
+    // When extracting digits from multiple rows, if rows span across column boundary,
+    // use linear position to wrap to next column
     
-    for (let c = 0; c < numCols; c++) {
+    // Get the linear positions of each found number
+    const linearPositions = validRows.map(vr => vr.col * numRows + vr.row);
+    
+    // For each starting column, extract digits using the ROW OFFSETS from the search numbers
+    // The key insight: the search numbers define row positions within a column
+    // If those rows go past row 24, continue into next column
+    const allFoundCells = [];
+    const totalCells = numRows * numCols;
+    
+    // Get row offsets relative to the first search number's position
+    const baseLinear = linearPositions[0];
+    const offsets = linearPositions.map(lp => lp - baseLinear);
+    
+    // Scan every possible starting position
+    for (let startLinear = 0; startLinear < totalCells; startLinear++) {
         const hundredsDigits = [];
         const tensDigits = [];
         const lastDigits = [];
+        let valid = true;
         
-        for (const vr of validRows) {
-            const cellVal = tableData[vr.row][c];
-            if (cellVal && cellVal.length >= 3) {
-                hundredsDigits.push(cellVal[0]);
-                tensDigits.push(cellVal[1]);
-                lastDigits.push(cellVal[2]);
-            }
+        for (let i = 0; i < offsets.length; i++) {
+            const pos = startLinear + offsets[i];
+            if (pos < 0 || pos >= totalCells) { valid = false; break; }
+            const c = Math.floor(pos / numRows);
+            const r = pos % numRows;
+            if (c >= numCols) { valid = false; break; }
+            const cellVal = tableData[r][c];
+            if (!cellVal || cellVal.length < 3) { valid = false; break; }
+            hundredsDigits.push(cellVal[0]);
+            tensDigits.push(cellVal[1]);
+            lastDigits.push(cellVal[2]);
         }
         
-        if (hundredsDigits.length < 2) continue;
+        if (!valid || hundredsDigits.length < 2) continue;
         
-        // Form the digit combos (e.g., for 3 rows: "142" from hundreds)
         const hundredsCombo = hundredsDigits.join('');
         const tensCombo = tensDigits.join('');
         const lastCombo = lastDigits.join('');
         
-        // Generate permutations for each combo and search the entire table
         const hundredsPerms = getPermutations3(hundredsCombo);
         const tensPerms = getPermutations3(tensCombo);
         const lastPerms = getPermutations3(lastCombo);
@@ -971,13 +990,13 @@ function performAllSearch(numbersStr) {
                 if (!val || val.length < 3) continue;
                 
                 if (hundredsPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'hundreds', sourceCol: c, combo: hundredsCombo });
+                    allFoundCells.push({ row: sr, col: sc, type: 'hundreds', sourceCol: Math.floor(startLinear / numRows), combo: hundredsCombo });
                 }
                 if (tensPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'tens', sourceCol: c, combo: tensCombo });
+                    allFoundCells.push({ row: sr, col: sc, type: 'tens', sourceCol: Math.floor(startLinear / numRows), combo: tensCombo });
                 }
                 if (lastPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'lasts', sourceCol: c, combo: lastCombo });
+                    allFoundCells.push({ row: sr, col: sc, type: 'lasts', sourceCol: Math.floor(startLinear / numRows), combo: lastCombo });
                 }
             }
         }
