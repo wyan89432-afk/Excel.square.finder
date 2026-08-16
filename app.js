@@ -217,7 +217,13 @@ function parseSearchInput(input) {
         return null;
     }
 
-    const numbers = rest.split(',').map(s => s.trim()).filter(s => s.length === 3 && /^\d{3}$/.test(s));
+    // A top/middle/last search is exactly three triples: yellow, green, red.
+    // If more are entered, keep only the first three valid triples.
+    const numbers = rest
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => /^\d{3}$/.test(s))
+        .slice(0, 3);
     if (numbers.length === 0) return null;
 
     return { position, numbers };
@@ -235,21 +241,29 @@ function findSquares(position, digits) {
     const squares = [];
     const numRows = tableData.length;
     const numCols = headers.length;
+    const totalCells = numRows * numCols;
+    const target = [...digits].sort().join('');
 
-    for (let col = 0; col < numCols; col++) {
-        for (let startRow = 0; startRow <= numRows - 3; startRow++) {
-            const d1 = getDigitAtPosition(tableData[startRow][col], position);
-            const d2 = getDigitAtPosition(tableData[startRow + 1][col], position);
-            const d3 = getDigitAtPosition(tableData[startRow + 2][col], position);
+    // Read three cells vertically, top-to-bottom. After the last row of a
+    // column, continue at the first row of the next column.
+    for (let startLinear = 0; startLinear <= totalCells - 3; startLinear++) {
+        const cells = [0, 1, 2].map(offset => {
+            const linear = startLinear + offset;
+            const col = Math.floor(linear / numRows);
+            const row = linear % numRows;
+            return { row, col, value: tableData[row][col] };
+        });
 
-            if (d1 < 0 || d2 < 0 || d3 < 0) continue;
+        const foundDigits = cells.map(cell => getDigitAtPosition(cell.value, position));
+        if (foundDigits.some(digit => digit < 0)) continue;
+        const found = foundDigits.sort().join('');
 
-            const found = [d1, d2, d3].sort().join('');
-            const target = [...digits].sort().join('');
-
-            if (found === target) {
-                squares.push({ col: col, startRow: startRow });
-            }
+        if (found === target) {
+            squares.push({
+                col: cells[0].col,
+                startRow: cells[0].row,
+                cells: cells.map(({ row, col }) => ({ row, col }))
+            });
         }
     }
 
@@ -312,12 +326,15 @@ function buildHighlightMap() {
 
     searchResults.highlights.forEach(h => {
         h.squares.forEach(sq => {
-            for (let r = 0; r < 3; r++) {
-                const key = `${sq.startRow + r}-${sq.col}`;
-                if (!map[key]) {
-                    map[key] = h.color;
-                }
-            }
+            const cells = sq.cells || [
+                { row: sq.startRow, col: sq.col },
+                { row: sq.startRow + 1, col: sq.col },
+                { row: sq.startRow + 2, col: sq.col }
+            ];
+            cells.forEach(({ row, col }) => {
+                const key = `${row}-${col}`;
+                if (!map[key]) map[key] = h.color;
+            });
         });
     });
 
@@ -533,11 +550,20 @@ function buildConnectionCellMap(connections) {
     const map = {};
 
     connections.forEach(conn => {
-        for (let r = 0; r < 3; r++) {
-            map[`${conn.yellow.startRow + r}-${conn.yellow.col}`] = 'yellow';
-            map[`${conn.green.startRow + r}-${conn.green.col}`] = 'green';
-            map[`${conn.red.startRow + r}-${conn.red.col}`] = 'red';
-        }
+        [
+            ['yellow', conn.yellow],
+            ['green', conn.green],
+            ['red', conn.red]
+        ].forEach(([color, square]) => {
+            const cells = square.cells || [
+                { row: square.startRow, col: square.col },
+                { row: square.startRow + 1, col: square.col },
+                { row: square.startRow + 2, col: square.col }
+            ];
+            cells.forEach(({ row, col }) => {
+                map[`${row}-${col}`] = color;
+            });
+        });
     });
 
     return map;
@@ -566,10 +592,18 @@ function drawConnectionLines(wrapper, table, connections) {
     const tableRect = table.getBoundingClientRect();
 
     connections.forEach(conn => {
-        // Get the middle cell of each 3-row square (startRow + 1)
-        const yellowCell = getTableCell(table, conn.yellow.startRow + 1, conn.yellow.col);
-        const greenCell = getTableCell(table, conn.green.startRow + 1, conn.green.col);
-        const redCell = getTableCell(table, conn.red.startRow + 1, conn.red.col);
+        // Use the middle item of each actual three-cell traversal.
+        const middleCell = square => {
+            const cells = square.cells || [
+                { row: square.startRow, col: square.col },
+                { row: square.startRow + 1, col: square.col },
+                { row: square.startRow + 2, col: square.col }
+            ];
+            return getTableCell(table, cells[1].row, cells[1].col);
+        };
+        const yellowCell = middleCell(conn.yellow);
+        const greenCell = middleCell(conn.green);
+        const redCell = middleCell(conn.red);
 
         if (yellowCell && greenCell) {
             svg.appendChild(createSvgLine(yellowCell, greenCell, tableRect));
