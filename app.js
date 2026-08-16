@@ -915,146 +915,83 @@ function drawProbablyArrows(arrowPairs, table, pairColors) {
 // 5. Display results with yellow highlight on the searched rows
 
 function performAllSearch(numbersStr) {
-    const numbers = numbersStr.split(',').map(s => s.trim()).filter(s => s.length === 3 && /^\d{3}$/.test(s));
-    
-    if (numbers.length < 2) {
-        alert('All Table: အနည်းဆုံး ဂဏန်း 2 ခု လိုအပ်ပါသည်။ (e.g. All=495,214)');
+    const numbers = numbersStr
+        .split(',')
+        .map(s => s.trim())
+        .filter(s => /^\d{3}$/.test(s));
+
+    if (numbers.length === 0) {
+        alert('All Table: ဂဏန်းသုံးလုံးတွဲ အနည်းဆုံးတစ်ခု ထည့်ပါ။ (e.g. All=123,456,489)');
         return;
     }
-    
-    // Hide other result tables, show All Table
+
     document.getElementById('table2Section').style.display = 'none';
     document.getElementById('table3Section').style.display = 'none';
     document.getElementById('table4Section').style.display = 'none';
     document.getElementById('table5Section').style.display = 'none';
     document.getElementById('table6Section').style.display = 'block';
-    
+
     const numRows = tableData.length;
     const numCols = headers.length;
-    
-    // Find which rows contain each search number
-    const searchRows = []; // array of {number, row, col} for each found number
-    for (const num of numbers) {
-        let found = false;
-        for (let r = 0; r < numRows && !found; r++) {
-            for (let c = 0; c < numCols && !found; c++) {
-                if (tableData[r][c] === num) {
-                    searchRows.push({ number: num, row: r, col: c });
-                    found = true;
-                }
-            }
-        }
-        if (!found) {
-            // Number not found in table, still add with row -1
-            searchRows.push({ number: num, row: -1, col: -1 });
-        }
-    }
-    
-    // Get the rows that were found
-    const validRows = searchRows.filter(sr => sr.row >= 0);
-    if (validRows.length < 2) {
-        const inner = document.getElementById('table6Inner');
-        inner.innerHTML = '<p style="color:#fbbf24;padding:20px;">ရှာဖွေသော ဂဏန်းများ fix table တွင် မတွေ့ပါ။</p>';
-        return;
-    }
-    
-    // For each column, extract digits from the found rows
-    // When rows exceed 24, wrap to next column (linear position)
-    // e.g. col 86 row 23 -> col 87 row 1
-    const highlightMap = {}; // "row-col" => color
-    const rowHighlights = {}; // rows to highlight yellow
-    
-    // Mark the search rows as yellow
-    validRows.forEach(vr => {
-        rowHighlights[vr.row] = true;
-    });
-    
-    // Convert row positions to linear positions for wrap-around
-    // Linear = col * numRows + row
-    // When extracting digits from multiple rows, if rows span across column boundary,
-    // use linear position to wrap to next column
-    
-    // Get the linear positions of each found number
-    const linearPositions = validRows.map(vr => vr.col * numRows + vr.row);
-    
-    // For each starting column, extract digits using the ROW OFFSETS from the search numbers
-    // The key insight: the search numbers define row positions within a column
-    // If those rows go past row 24, continue into next column
-    const allFoundCells = [];
     const totalCells = numRows * numCols;
-    
-    // Get row offsets relative to the first search number's position
-    const baseLinear = linearPositions[0];
-    const offsets = linearPositions.map(lp => lp - baseLinear);
-    
-    // Scan every possible starting position
-    for (let startLinear = 0; startLinear < totalCells; startLinear++) {
-        const hundredsDigits = [];
-        const tensDigits = [];
-        const lastDigits = [];
-        let valid = true;
-        
-        for (let i = 0; i < offsets.length; i++) {
-            const pos = startLinear + offsets[i];
-            if (pos < 0 || pos >= totalCells) { valid = false; break; }
-            const c = Math.floor(pos / numRows);
-            const r = pos % numRows;
-            if (c >= numCols) { valid = false; break; }
-            const cellVal = tableData[r][c];
-            if (!cellVal || cellVal.length < 3) { valid = false; break; }
-            hundredsDigits.push(cellVal[0]);
-            tensDigits.push(cellVal[1]);
-            lastDigits.push(cellVal[2]);
-        }
-        
-        if (!valid || hundredsDigits.length < 2) continue;
-        
-        const hundredsCombo = hundredsDigits.join('');
-        const tensCombo = tensDigits.join('');
-        const lastCombo = lastDigits.join('');
-        
-        const hundredsPerms = getPermutations3(hundredsCombo);
-        const tensPerms = getPermutations3(tensCombo);
-        const lastPerms = getPermutations3(lastCombo);
-        
-        // Search entire table for these permutations
-        for (let sr = 0; sr < numRows; sr++) {
-            for (let sc = 0; sc < numCols; sc++) {
-                const val = tableData[sr][sc];
-                if (!val || val.length < 3) continue;
-                
-                if (hundredsPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'hundreds', sourceCol: Math.floor(startLinear / numRows), combo: hundredsCombo });
-                }
-                if (tensPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'tens', sourceCol: Math.floor(startLinear / numRows), combo: tensCombo });
-                }
-                if (lastPerms.includes(val)) {
-                    allFoundCells.push({ row: sr, col: sc, type: 'lasts', sourceCol: Math.floor(startLinear / numRows), combo: lastCombo });
-                }
-            }
-        }
+    const targets = new Set(numbers);
+    const permutations = value => new Set(getPermutations3(value));
+
+    // Each window is three consecutive cells in column-major order:
+    // row 1-3, row 2-4, ... row 22-24, row 23 -> next column row 1, etc.
+    const allFoundCells = [];
+    const qualifyingWindows = [];
+
+    for (let startLinear = 0; startLinear <= totalCells - 3; startLinear++) {
+        const cells = [0, 1, 2].map(offset => {
+            const linear = startLinear + offset;
+            const col = Math.floor(linear / numRows);
+            const row = linear % numRows;
+            return { row, col, value: tableData[row][col] };
+        });
+
+        if (cells.some(cell => !/^\d{3}$/.test(cell.value))) continue;
+
+        const digitCombos = {
+            hundreds: cells.map(cell => cell.value[0]).join(''),
+            tens: cells.map(cell => cell.value[1]).join(''),
+            units: cells.map(cell => cell.value[2]).join('')
+        };
+
+        const matchedTypes = Object.entries(digitCombos)
+            .filter(([, combo]) => [...permutations(combo)].some(value => targets.has(value)))
+            .map(([type]) => type);
+
+        // A window is displayed only when at least two of the three digit
+        // types match. Two matches are yellow; all three matches are red.
+        if (matchedTypes.length < 2) continue;
+
+        const color = matchedTypes.length === 3 ? 'red' : 'yellow';
+        qualifyingWindows.push({ cells, matchedTypes, digitCombos, color });
+        cells.forEach(cell => {
+            allFoundCells.push({
+                row: cell.row,
+                col: cell.col,
+                type: matchedTypes.join(','),
+                color,
+                combo: digitCombos
+            });
+        });
     }
-    
-    // Build highlight map
-    // Yellow for search rows (entire row)
-    for (let r = 0; r < numRows; r++) {
-        if (rowHighlights[r]) {
-            for (let c = 0; c < numCols; c++) {
-                highlightMap[`${r}-${c}`] = 'yellow';
+
+    const highlightMap = {};
+    qualifyingWindows.forEach(window => {
+        window.cells.forEach(({ row, col }) => {
+            const key = `${row}-${col}`;
+            // Red has priority if a cell belongs to both a two-type and a
+            // three-type qualifying window.
+            if (window.color === 'red' || !highlightMap[key]) {
+                highlightMap[key] = window.color;
             }
-        }
-    }
-    
-    // Green for found cells
-    allFoundCells.forEach(fc => {
-        const key = `${fc.row}-${fc.col}`;
-        if (!highlightMap[key]) {
-            highlightMap[key] = 'green';
-        }
+        });
     });
-    
-    renderAllTable(highlightMap, validRows, allFoundCells, numbers);
+
+    renderAllTable(highlightMap, qualifyingWindows, allFoundCells, numbers);
 }
 
 function getPermutations3(str) {
@@ -1111,9 +1048,10 @@ function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
     const info = document.createElement('div');
     info.style.padding = '10px';
     info.style.color = '#aaa';
+    const redWindows = validRows.filter(window => window.color === 'red').length;
+    const yellowWindows = validRows.filter(window => window.color === 'yellow').length;
     info.innerHTML = `<strong style="color:#fbbf24">All Table</strong> | Search: ${searchNumbers.join(', ')} | ` +
-        `Rows found: ${validRows.map(v => 'R' + (v.row + 1)).join(', ')} | ` +
-        `Matches: ${foundCells.length}`;
+        `Qualifying 3-row windows: ${validRows.length} | Yellow: ${yellowWindows} | Red: ${redWindows}`;
     inner.appendChild(info);
     
     // Create table
@@ -1152,6 +1090,8 @@ function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
             const key = `${ri}-${ci}`;
             if (highlightMap[key] === 'yellow') {
                 td.className = 'highlight-yellow';
+            } else if (highlightMap[key] === 'red') {
+                td.className = 'highlight-red';
             } else if (highlightMap[key] === 'green') {
                 td.className = 'highlight-green';
             }
@@ -1162,98 +1102,6 @@ function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
     table.appendChild(tbody);
     inner.appendChild(table);
     
-    // Draw curved arrows connecting found cells
-    setTimeout(() => drawAllTableArrows(inner, table, validRows, foundCells), 200);
-}
-
-function drawAllTableArrows(inner, table, validRows, foundCells) {
-    const existing = inner.querySelector('.svg-overlay');
-    if (existing) existing.remove();
-    
-    if (foundCells.length === 0) return;
-    
-    const w = table.scrollWidth;
-    const h = table.scrollHeight;
-    const svgNS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(svgNS, "svg");
-    svg.classList.add('svg-overlay');
-    svg.style.position = 'absolute';
-    svg.style.top = '0';
-    svg.style.left = '0';
-    svg.style.width = w + 'px';
-    svg.style.height = h + 'px';
-    svg.style.pointerEvents = 'none';
-    svg.style.zIndex = '15';
-    svg.setAttribute('width', w);
-    svg.setAttribute('height', h);
-    
-    // Arrowhead
-    const defs = document.createElementNS(svgNS, 'defs');
-    const marker = document.createElementNS(svgNS, 'marker');
-    marker.setAttribute('id', 'all-arr');
-    marker.setAttribute('markerWidth', '8');
-    marker.setAttribute('markerHeight', '8');
-    marker.setAttribute('refX', '6');
-    marker.setAttribute('refY', '3');
-    marker.setAttribute('orient', 'auto');
-    const markerPath = document.createElementNS(svgNS, 'path');
-    markerPath.setAttribute('d', 'M0,0 L6,3 L0,6 Z');
-    markerPath.setAttribute('fill', '#00ff00');
-    marker.appendChild(markerPath);
-    defs.appendChild(marker);
-    svg.appendChild(defs);
-    
-    const tableRect = table.getBoundingClientRect();
-    
-    // Draw arrows from each valid row's cell to the found cell
-    // Group by sourceCol to avoid too many arrows
-    const drawnPairs = new Set();
-    
-    foundCells.forEach(fc => {
-        // Connect from the source column in the search row to the found cell
-        const sourceRow = validRows[0].row; // use first search row as source
-        const sourceKey = `${sourceRow}-${fc.sourceCol}`;
-        const targetKey = `${fc.row}-${fc.col}`;
-        const pairKey = sourceKey + '->' + targetKey;
-        
-        if (drawnPairs.has(pairKey)) return;
-        drawnPairs.add(pairKey);
-        
-        const cellA = document.getElementById(`all-cell-${sourceRow}-${fc.sourceCol}`);
-        const cellB = document.getElementById(`all-cell-${fc.row}-${fc.col}`);
-        if (!cellA || !cellB) return;
-        
-        const rA = cellA.getBoundingClientRect();
-        const rB = cellB.getBoundingClientRect();
-        
-        const x1 = rA.left - tableRect.left + rA.width / 2;
-        const y1 = rA.top - tableRect.top + rA.height / 2;
-        const x2 = rB.left - tableRect.left + rB.width / 2;
-        const y2 = rB.top - tableRect.top + rB.height / 2;
-        
-        const dx = x2 - x1;
-        const dy = y2 - y1;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist === 0) return;
-        
-        const bend = Math.min(60, Math.max(20, dist * 0.25));
-        const mx = (x1 + x2) / 2;
-        const my = (y1 + y2) / 2;
-        const px = -dy / dist;
-        const py = dx / dist;
-        const cx = mx + px * bend;
-        const cy = my + py * bend;
-        
-        const path = document.createElementNS(svgNS, 'path');
-        path.setAttribute('d', `M ${x1} ${y1} Q ${cx} ${cy} ${x2} ${y2}`);
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', '#00ff00');
-        path.setAttribute('stroke-width', '1.5');
-        path.setAttribute('stroke-opacity', '0.7');
-        path.setAttribute('marker-end', 'url(#all-arr)');
-        svg.appendChild(path);
-    });
-    
-    inner.style.position = 'relative';
-    inner.appendChild(svg);
+    // Results are represented directly by the qualifying three-row windows;
+    // the old arrows depended on the removed fixed-row search model.
 }

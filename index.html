@@ -18,7 +18,7 @@
             <div class="search-help">
                 <small>Format: top/middle/last + 3 digits | Xp=DIGITS for Probably Table | All=123,456 for All Table<br>
                 top=first digit, middle=second, last=third | Xp=gap (0p=adjacent, 1p=1 row gap)<br>
-                All=numbers (min 2): searches hundreds/tens/last digits across rows | Ctrl+Scroll to zoom</small>
+                All=three-digit numbers: overlapping vertical 3-row windows; 2 matched types = yellow, 3 = red | Ctrl+Scroll to zoom</small>
             </div>
         </div>
 
@@ -88,7 +88,7 @@
         <!-- Table 6: All Table -->
         <div class="table-section" id="table6Section" style="display:none;">
             <h2>Table-6: All Table</h2>
-            <p class="table-desc">Search format: All=123,456,489 (min 2 numbers). Finds hundreds/tens/last digit combinations across specified rows.</p>
+            <p class="table-desc">Search format: All=123,456,489. Scans overlapping vertical 3-row windows; 2 matched digit types are yellow, all 3 are red.</p>
             <div class="table-controls">
                 <div class="zoom-controls">
                     <button onclick="zoomOut('table6')">−</button>
