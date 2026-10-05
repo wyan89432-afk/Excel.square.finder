@@ -173,6 +173,24 @@ th {
     z-index: 10;
 }
 
+/* Keep the live row-label column visible while the wide table scrolls sideways. */
+th.row-number,
+td.row-number {
+    position: sticky;
+    left: 0;
+    z-index: 12;
+    min-width: 54px;
+    width: 54px;
+}
+
+th.row-number {
+    z-index: 20;
+}
+
+td.row-number {
+    z-index: 11;
+}
+
 td {
     background: #fff;
     color: #000;
