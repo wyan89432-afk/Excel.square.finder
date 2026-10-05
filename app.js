@@ -125,8 +125,7 @@ function applyZoom(tableId) {
     if (!wrapper) return;
     const inner = wrapper.querySelector('.table-inner');
     if (inner) {
-        inner.style.transform = `scale(${zoomLevels[tableId]})`;
-        inner.style.transformOrigin = 'top left';
+        inner.style.zoom = zoomLevels[tableId];
     }
 }
 
@@ -142,7 +141,7 @@ function renderTable1() {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -368,7 +367,7 @@ function renderTable2() {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -463,7 +462,7 @@ function renderTable3() {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -520,7 +519,7 @@ function renderTable4() {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -872,7 +871,7 @@ function renderProbablyTable(results, gap, digits) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
 
@@ -1169,7 +1168,7 @@ function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
     const rowNumTh = document.createElement('th');
-    rowNumTh.textContent = 'No.';
+    rowNumTh.textContent = '0';
     rowNumTh.className = 'row-number';
     headerRow.appendChild(rowNumTh);
     
