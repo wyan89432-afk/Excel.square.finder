@@ -2,16 +2,91 @@
 let tableData = JSON.parse(JSON.stringify(TABLE_DATA));
 let headers = [...TABLE_HEADERS];
 let searchResults = null;
+let sourceRowLabels = [];
 let zoomLevels = { table1: 1, table2: 1, table3: 1, table4: 1, table5: 1, table6: 1 };
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Render immediately, then replace the row labels with the live "0" column
+    // from key_and_one_change when it is available.
+    sourceRowLabels = tableData.map((_, i) => String(i + 1));
     renderTable1();
     setupZoom();
+    await loadSourceRowLabels();
     document.getElementById('searchInput').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') performSearch();
     });
 });
+
+// ============ LIVE ROW LABEL SOURCE ============
+// The row-number column is intentionally tied to the "0" column of
+// key_and_one_change. This keeps row labels aligned with the source table
+// even when the main table is horizontally scrolled.
+const ROW_LABEL_SOURCE = 'https://wyan89432-afk.github.io/key_and_one_change/fixed-table.csv';
+
+function parseCsvLine(line) {
+    const values = [];
+    let value = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+            if (quoted && line[i + 1] === '"') {
+                value += '"';
+                i++;
+            } else {
+                quoted = !quoted;
+            }
+        } else if (ch === ',' && !quoted) {
+            values.push(value.trim());
+            value = '';
+        } else {
+            value += ch;
+        }
+    }
+    values.push(value.trim());
+    return values;
+}
+
+function getRowLabel(rowIndex) {
+    return sourceRowLabels[rowIndex] ?? String(rowIndex + 1);
+}
+
+async function loadSourceRowLabels() {
+    try {
+        const response = await fetch(ROW_LABEL_SOURCE + '?v=' + Date.now(), {
+            cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('Source table request failed: ' + response.status);
+
+        const csv = (await response.text()).replace(/^\\uFEFF/, '');
+        const lines = csv.split(/\\r?\\n/).filter(line => line.trim() !== '');
+        if (!lines.length) throw new Error('Source table is empty');
+
+        const header = parseCsvLine(lines[0]).map(v => v.trim());
+        const zeroColumnIndex = header.findIndex(v => v === '0');
+        if (zeroColumnIndex < 0) throw new Error('Source table has no "0" column');
+
+        const labels = lines.slice(1).map(line => parseCsvLine(line)[zeroColumnIndex] ?? '');
+        if (!labels.length) throw new Error('Source table has no data rows');
+
+        sourceRowLabels = tableData.map((_, i) => {
+            const label = labels[i];
+            return label === undefined || label === '' ? String(i + 1) : label;
+        });
+
+        renderTable1();
+        if (searchResults) {
+            renderTable2();
+            renderTable3();
+            renderTable4();
+        }
+    } catch (error) {
+        // Keep the app usable if the external source is temporarily unavailable.
+        // The fallback is the original 1,2,3... row numbering.
+        console.warn('Could not load live row labels from key_and_one_change:', error);
+    }
+}
 
 // ============ ZOOM FEATURE ============
 function setupZoom() {
@@ -84,7 +159,7 @@ function renderTable1() {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
 
         row.forEach((cell, ci) => {
@@ -310,7 +385,7 @@ function renderTable2() {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
 
         row.forEach((cell, ci) => {
@@ -405,7 +480,7 @@ function renderTable3() {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
 
         row.forEach((cell, ci) => {
@@ -462,7 +537,7 @@ function renderTable4() {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
 
         row.forEach((cell, ci) => {
@@ -814,7 +889,7 @@ function renderProbablyTable(results, gap, digits) {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
 
         for (let ci = 0; ci < numCols; ci++) {
@@ -1111,7 +1186,7 @@ function renderAllTable(highlightMap, validRows, foundCells, searchNumbers) {
         const tr = document.createElement('tr');
         const rowNumTd = document.createElement('td');
         rowNumTd.className = 'row-number';
-        rowNumTd.textContent = ri + 1;
+        rowNumTd.textContent = getRowLabel(ri);
         tr.appendChild(rowNumTd);
         
         for (let ci = 0; ci < numCols; ci++) {
