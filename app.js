@@ -246,10 +246,11 @@ function findSquares(position, digits) {
     const numRows = tableData.length;
     const numCols = headers.length;
     const totalCells = numRows * numCols;
+
+    // Order does not matter: 134 == 431 == 413, etc.
+    // This applies equally to top, middle, and last searches.
     const target = [...digits].sort().join('');
 
-    // Read three cells vertically, top-to-bottom. After the last row of a
-    // column, continue at the first row of the next column.
     for (let startLinear = 0; startLinear <= totalCells - 3; startLinear++) {
         const cells = [0, 1, 2].map(offset => {
             const linear = startLinear + offset;
@@ -258,9 +259,13 @@ function findSquares(position, digits) {
             return { row, col, value: tableData[row][col] };
         });
 
-        const foundDigits = cells.map(cell => getDigitAtPosition(cell.value, position));
+        const foundDigits = cells.map(cell =>
+            getDigitAtPosition(cell.value, position)
+        );
+
         if (foundDigits.some(digit => digit < 0)) continue;
-        const found = foundDigits.sort().join('');
+
+        const found = [...foundDigits].sort().join('');
 
         if (found === target) {
             squares.push({
@@ -312,8 +317,27 @@ function renderTable2() {
             const td = document.createElement('td');
             td.textContent = cell;
             const key = `${ri}-${ci}`;
-            if (highlightMap[key]) {
-                td.className = `highlight-${highlightMap[key]}`;
+            const colorsAtCell = highlightMap[key];
+            if (colorsAtCell && colorsAtCell.length) {
+                // One cell can belong to more than one 3-row match.
+                // Use a striped background so every matched color remains visible.
+                if (colorsAtCell.length === 1) {
+                    td.className = `highlight-${colorsAtCell[0]}`;
+                } else {
+                    const colorMap = {
+                        yellow: '#fbbf24',
+                        green: '#22c55e',
+                        red: '#ef4444'
+                    };
+                    const stops = colorsAtCell.map((c, idx) => {
+                        const from = (idx * 100) / colorsAtCell.length;
+                        const to = ((idx + 1) * 100) / colorsAtCell.length;
+                        return `${colorMap[c]} ${from}% ${to}%`;
+                    });
+                    td.style.background = `linear-gradient(135deg, ${stops.join(', ')})`;
+                    td.style.color = '#000';
+                    td.style.fontWeight = 'bold';
+                }
             }
             tr.appendChild(td);
         });
@@ -328,6 +352,9 @@ function buildHighlightMap() {
     const map = {};
     if (!searchResults) return map;
 
+    // Keep ALL colors that touch the same cell. The old code kept only the
+    // first color, which caused Green to appear Yellow and Red to appear Green
+    // whenever the 3-row matches overlapped.
     searchResults.highlights.forEach(h => {
         h.squares.forEach(sq => {
             const cells = sq.cells || [
@@ -337,7 +364,8 @@ function buildHighlightMap() {
             ];
             cells.forEach(({ row, col }) => {
                 const key = `${row}-${col}`;
-                if (!map[key]) map[key] = h.color;
+                if (!map[key]) map[key] = [];
+                if (!map[key].includes(h.color)) map[key].push(h.color);
             });
         });
     });
