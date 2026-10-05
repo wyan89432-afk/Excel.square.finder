@@ -148,7 +148,11 @@ function addColumn() {
 
 // ============ SEARCH LOGIC ============
 function performSearch() {
-    const input = document.getElementById('searchInput').value.trim();
+    // Normalize whitespace so inputs like "top 134,334,789",
+    // "top134, 334,789", "All = 123,456", and "1p = 246" work.
+    const input = document.getElementById('searchInput').value
+        .trim()
+        .replace(/\s+/g, '');
     if (!input) return;
 
     // Check if it's an All Table search (All=123,456,...)
